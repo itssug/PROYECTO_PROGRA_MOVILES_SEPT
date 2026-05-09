@@ -4,4 +4,7 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('core.urls')),
+
+    #modulo gi
+    path('api/estado-sueno/', include('estado_sueno.urls')),
 ]
