@@ -60,7 +60,6 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UsuarioPublicoSerializer(serializers.ModelSerializer):
-    """Datos seguros para devolver al cliente (sin password)."""
     class Meta:
         model = Usuarios
         fields = [
@@ -70,9 +69,10 @@ class UsuarioPublicoSerializer(serializers.ModelSerializer):
             'tiene_dislipidemia', 'es_fumador', 'nivel_actividad_base',
             'fecha_registro',
         ]
+        read_only_fields = ['id', 'fecha_registro']  # ← Solo estos dos
+
     def get_imc(self, obj):
         with connection.cursor() as cursor:
             cursor.execute("SELECT imc FROM usuarios WHERE id = %s", [obj.id])
             row = cursor.fetchone()
         return float(row[0]) if row and row[0] else None
-
