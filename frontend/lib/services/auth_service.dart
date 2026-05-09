@@ -27,6 +27,45 @@ class AuthService {
     'Authorization': 'Token $_token',
   };
 
+  static Future<void> actualizarPerfilLocal(
+    Map<String, dynamic> nuevoPerfil,
+  ) async {
+    _usuario = nuevoPerfil;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_usuario', jsonEncode(nuevoPerfil));
+  }
+
+  // ============================================================
+// ARCHIVO: lib/services/auth_service.dart
+// AGREGAR MÉTODO PARA OBTENER TOKEN DE FORMA SEGURA
+// ============================================================
+
+// Agrega este método al final de la clase AuthService:
+static Future<String?> getTokenSeguro() async {
+  // Si ya tenemos token en memoria, usarlo
+  if (_token != null) return _token;
+  
+  // Si no, intentar cargar desde SharedPreferences
+  final prefs = await SharedPreferences.getInstance();
+  final savedToken = prefs.getString('auth_token');
+  if (savedToken != null) {
+    _token = savedToken;
+    return _token;
+  }
+  return null;
+}
+
+
+
+// También modifica authHeaders para que sea async o usa un getter seguro:
+static Future<Map<String, String>> getAuthHeaders() async {
+  final token = await getTokenSeguro();
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': 'Token $token',
+  };
+}
+
   static Future<bool> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -54,19 +93,19 @@ class AuthService {
     required String email,
     required String password,
     required String confirmarPassword,
-    
+
     // Campos opcionales del serializer
-    String? fechaNacimiento,      // Nuevo: fecha de nacimiento
-    String? sexo,                  // masculino, femenino, otro
-    double? peso,                  // en kg
-    double? altura,                // en cm
-    int? aniosDiagnostico,         // años desde diagnóstico
-    double? hba1cInicial,          // Nuevo: nivel de HbA1c inicial
-    int? usaInsulina,              // 0 o 1
-    int? tieneHipertension,        // 0 o 1
-    int? tieneDislipidemia,        // 0 o 1
-    int? esFumador,                // Nuevo: 0 o 1
-    String? nivelActividadBase,    // sedentario, moderado, activo
+    String? fechaNacimiento, // Nuevo: fecha de nacimiento
+    String? sexo, // masculino, femenino, otro
+    double? peso, // en kg
+    double? altura, // en cm
+    int? aniosDiagnostico, // años desde diagnóstico
+    double? hba1cInicial, // Nuevo: nivel de HbA1c inicial
+    int? usaInsulina, // 0 o 1
+    int? tieneHipertension, // 0 o 1
+    int? tieneDislipidemia, // 0 o 1
+    int? esFumador, // Nuevo: 0 o 1
+    String? nivelActividadBase, // sedentario, moderado, activo
   }) async {
     try {
       final body = <String, dynamic>{
@@ -75,7 +114,7 @@ class AuthService {
         'email': email,
         'password': password,
         'confirmar_password': confirmarPassword,
-        
+
         // Campos con valores por defecto
         'usa_insulina': usaInsulina ?? 0,
         'tiene_hipertension': tieneHipertension ?? 0,
@@ -124,12 +163,12 @@ class AuthService {
       if (res.statusCode == 201) {
         final token = data['token'];
         final usuario = data['usuario'];
-        
+
         print('✅ Registro exitoso!');
         print('Token: $token');
         print('Usuario ID: ${usuario['id']}');
         print('Nombre: ${usuario['nombre']}');
-        
+
         await _guardarSesion(token, usuario);
       } else {
         throw Exception(_extraerError(data));
@@ -137,7 +176,9 @@ class AuthService {
     } on TimeoutException {
       throw Exception('⏰ Tiempo de espera agotado. Verifica tu conexión.');
     } on http.ClientException {
-      throw Exception('🔌 No se puede conectar al servidor. Verifica que el backend esté corriendo.');
+      throw Exception(
+        '🔌 No se puede conectar al servidor. Verifica que el backend esté corriendo.',
+      );
     } catch (e) {
       print('❌ Error en registro: $e');
       rethrow;
@@ -153,7 +194,7 @@ class AuthService {
   }) async {
     try {
       print('📤 Intentando login: $email');
-      
+
       final res = await http
           .post(
             Uri.parse('$_base/auth/login/'),
@@ -170,10 +211,10 @@ class AuthService {
       if (res.statusCode == 200) {
         final token = data['token'];
         final usuario = data['usuario'];
-        
+
         print('✅ Login exitoso!');
         print('Usuario: ${usuario['nombre']}');
-        
+
         await _guardarSesion(token, usuario);
       } else {
         throw Exception(_extraerError(data));
@@ -191,10 +232,7 @@ class AuthService {
   static Future<void> logout() async {
     try {
       await http
-          .post(
-            Uri.parse('$_base/auth/logout/'),
-            headers: authHeaders,
-          )
+          .post(Uri.parse('$_base/auth/logout/'), headers: authHeaders)
           .timeout(const Duration(seconds: 10));
     } catch (_) {}
     await _borrarSesion();
@@ -204,10 +242,7 @@ class AuthService {
   static Future<Map<String, dynamic>> getPerfil() async {
     try {
       final res = await http
-          .get(
-            Uri.parse('$_base/auth/perfil/'),
-            headers: authHeaders,
-          )
+          .get(Uri.parse('$_base/auth/perfil/'), headers: authHeaders)
           .timeout(_timeout);
 
       if (res.statusCode == 200) {
@@ -229,7 +264,8 @@ class AuthService {
   }
 
   static Future<Map<String, dynamic>> updatePerfil(
-      Map<String, dynamic> campos) async {
+    Map<String, dynamic> campos,
+  ) async {
     try {
       final res = await http
           .put(
@@ -255,14 +291,16 @@ class AuthService {
   }
 
   static Future<void> _guardarSesion(
-      String token, Map<String, dynamic> usuario) async {
+    String token,
+    Map<String, dynamic> usuario,
+  ) async {
     _token = token;
     _usuario = usuario;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
     await prefs.setString('auth_usuario', jsonEncode(usuario));
-    
+
     print('💾 Sesión guardada para: ${usuario['nombre']}');
   }
 
