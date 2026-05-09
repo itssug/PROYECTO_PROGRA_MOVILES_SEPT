@@ -1,85 +1,56 @@
-// import 'package:flutter/material.dart';
-// import 'services/api_service.dart';
-
-// void main() {
-//   runApp(const MyApp());
-// }
-
-// class MyApp extends StatelessWidget {
-//   const MyApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       home: Home(),
-//     );
-//   }
-// }
-
-// class Home extends StatefulWidget {
-//   @override
-//   State<Home> createState() => _HomeState();
-// }
-
-// class _HomeState extends State<Home> {
-
-//   String mensaje = "Cargando...";
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     obtenerDatos();
-//   }
-
-//   Future<void> obtenerDatos() async {
-
-//     try {
-
-//       final res = await ApiService.test();
-
-//       setState(() {
-//         mensaje = res;
-//       });
-
-//     } catch (e) {
-
-//       setState(() {
-//         mensaje = "Error: $e";
-//       });
-//     }
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: const Text("Prueba API"),
-//       ),
-//       body: Center(
-//         child: Text(mensaje),
-//       ),
-//     );
-//   }
-// }
 
 import 'package:flutter/material.dart';
+import 'services/auth_service.dart';
 import 'screens/inicio/principal_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
+import 'screens/home.dart';
+import 'screens/app_colors.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializar AuthService
+  final hasSession = await AuthService.init();
+  
+  runApp(MyApp(hasSession: hasSession));
 }
 
 class MyApp extends StatelessWidget {
-
-  const MyApp({super.key});
+  final bool hasSession;
+  
+  const MyApp({super.key, required this.hasSession});
 
   @override
   Widget build(BuildContext context) {
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const PrincipalScreen(),
+      title: 'GlucoWatch',
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: AppColors.bg,
+      ),
+      // NO USAR 'home' Y 'routes' AL MISMO TIEMPO
+      // Usamos initialRoute en lugar de home
+      initialRoute: hasSession ? '/home' : '/onboarding',
+      routes: {
+        '/onboarding': (context) => const PrincipalScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
+        '/home': (context) => const HomeScreen(),
+      },
+      // Manejar rutas no encontradas
+      onUnknownRoute: (settings) {
+        return MaterialPageRoute(
+          builder: (context) => const Scaffold(
+            body: Center(
+              child: Text(
+                'Página no encontrada',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
