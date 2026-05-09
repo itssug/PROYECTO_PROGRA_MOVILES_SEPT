@@ -1,64 +1,50 @@
+// ============================================================
+// ARCHIVO: lib/main.dart
+// ============================================================
 import 'package:flutter/material.dart';
-import 'services/api_service.dart';
+import 'services/auth_service.dart';
+import 'screens/home.dart';
+import 'screens/inicio/Principal_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
+import 'screens/app_colors.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  final hasSession = await AuthService.init();
+  
+  runApp(MyApp(hasSession: hasSession));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool hasSession;
+  
+  const MyApp({super.key, required this.hasSession});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Home(),
-    );
-  }
-}
-
-class Home extends StatefulWidget {
-  @override
-  State<Home> createState() => _HomeState();
-}
-
-class _HomeState extends State<Home> {
-
-  String mensaje = "Cargando...";
-
-  @override
-  void initState() {
-    super.initState();
-    obtenerDatos();
-  }
-
-  Future<void> obtenerDatos() async {
-
-    try {
-
-      final res = await ApiService.test();
-
-      setState(() {
-        mensaje = res;
-      });
-
-    } catch (e) {
-
-      setState(() {
-        mensaje = "Error: $e";
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Prueba API"),
+      debugShowCheckedModeBanner: false,
+      title: 'GlucoWatch',
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: AppColors.bg,
       ),
-      body: Center(
-        child: Text(mensaje),
-      ),
+      home: hasSession ? const HomeScreen() : const PrincipalScreen(),
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/login':
+            return MaterialPageRoute(builder: (_) => const LoginScreen());
+          case '/register':
+            return MaterialPageRoute(builder: (_) => const RegisterScreen());
+          case '/home':
+            return MaterialPageRoute(builder: (_) => const HomeScreen());
+          case '/onboarding':
+            return MaterialPageRoute(builder: (_) => const PrincipalScreen());
+          default:
+            return null;
+        }
+      },
     );
   }
 }
