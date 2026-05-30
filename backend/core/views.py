@@ -106,38 +106,38 @@ class PerfilView(APIView):
         auth_header = request.headers.get('Authorization', '')
         key = auth_header.replace('Token ', '').strip()
         
-        print(f"🔍 Debug - Header completo: {auth_header}")
-        print(f"🔍 Debug - Token extraído: '{key}'")
-        print(f"🔍 Debug - Longitud token: {len(key)}")
+        print(f" Debug - Header completo: {auth_header}")
+        print(f" Debug - Token extraído: '{key}'")
+        print(f" Debug - Longitud token: {len(key)}")
         
         if not key:
-            print("❌ No hay token en el header")
+            print(" No hay token en el header")
             return None
         
         try:
             # Buscar el token en la base de datos
             token_obj = TokenUsuario.objects.get(key=key)
-            print(f"✅ Token encontrado en BD para usuario_id: {token_obj.usuario_id}")
+            print(f" Token encontrado en BD para usuario_id: {token_obj.usuario_id}")
             
             # Obtener el usuario
             from .models import Usuarios
             usuario = Usuarios.objects.get(id=token_obj.usuario_id)
-            print(f"✅ Usuario encontrado: {usuario.email}")
+            print(f" Usuario encontrado: {usuario.email}")
             return usuario
             
         except TokenUsuario.DoesNotExist:
-            print(f"❌ Token no existe en BD: {key}")
+            print(f" Token no existe en BD: {key}")
             # Listar tokens existentes para depuración
             tokens_existentes = TokenUsuario.objects.all().values_list('key', flat=True)[:3]
-            print(f"📋 Tokens en BD (primeros 3): {list(tokens_existentes)}")
+            print(f" Tokens en BD (primeros 3): {list(tokens_existentes)}")
             return None
             
         except Usuarios.DoesNotExist:
-            print(f"❌ Usuario no encontrado para id: {token_obj.usuario_id}")
+            print(f" Usuario no encontrado para id: {token_obj.usuario_id}")
             return None
         
         except Exception as e:
-            print(f"❌ Error inesperado: {e}")
+            print(f" Error inesperado: {e}")
             return None
 
     def get(self, request):

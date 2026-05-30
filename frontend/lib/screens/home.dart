@@ -1,5 +1,5 @@
 // ============================================================
-// ARCHIVO: lib/screens/home.dart
+// ARCHIVO: lib/screens/home.dart (VERSIÓN MODIFICADA)
 // ============================================================
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
@@ -8,6 +8,7 @@ import '../widgets/shared_widgets.dart';
 import 'app_colors.dart';
 import 'usuarios/salud.dart';
 import 'usuarios/perfil.dart';
+import 'usuarios/objetivos_graficos.dart'; // 👈 AÑADE ESTA IMPORTACIÓN
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,11 +28,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _cargarPerfil();
   }
 
-  // En _cargarPerfil(), modifica:
   Future<void> _cargarPerfil() async {
     setState(() => _cargando = true);
     try {
-      // ✅ getPerfil() ya maneja el 401 internamente
       final perfil = await PerfilService.getPerfil();
       setState(() => _perfil = perfil);
     } catch (e) {
@@ -46,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Método para recargar perfil después de editar
   void _recargarPerfil() {
     _cargarPerfil();
   }
@@ -278,7 +276,38 @@ class DashboardScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Botón rápido
+          // ============================================================
+          // 👇 AQUÍ AGREGA ESTE BLOQUE (LÍNEA APROXIMADA 166)
+          // ============================================================
+          
+          // Botón para ver mis objetivos y gráficas
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ObjetivosGraficosScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.show_chart),
+              label: const Text('Ver mis objetivos y gráficas'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.orange,
+                side: BorderSide(color: AppColors.orange),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Botón rápido para registrar glucosa
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -297,6 +326,10 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
           ),
+          
+          // ============================================================
+          // FIN DEL BLOQUE AGREGADO
+          // ============================================================
         ],
       ),
     );

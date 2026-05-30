@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  static const String _base = 'http://localhost:8000/api';
+  static const String _base = 'http://192.168.212.3:8000/api';
   static const Duration _timeout = Duration(seconds: 30);
 
   static String? _token;

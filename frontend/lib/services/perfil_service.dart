@@ -9,7 +9,7 @@ import 'auth_service.dart';
 import '../screens/app_colors.dart';
 
 class PerfilService {
-  static const String _base = 'http://localhost:8000/api';
+  static const String _base = 'http://192.168.212.3:8000/api';
   static const Duration _timeout = Duration(seconds: 30);
 
   // ============================================================
