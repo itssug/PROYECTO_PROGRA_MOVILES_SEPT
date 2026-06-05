@@ -85,7 +85,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'glucosa_app',
         'USER': 'root',
-        'PASSWORD': '2314266',
+        'PASSWORD': '',
         'HOST': 'localhost',
         'PORT': '3306',
     }
