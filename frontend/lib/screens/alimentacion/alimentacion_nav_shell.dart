@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/screens/alimentacion/analysis_screen.dart';
-import 'package:frontend/screens/alimentacion/diets_screen.dart';
+import 'analysis_screen.dart';
+import 'diets_screen.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);

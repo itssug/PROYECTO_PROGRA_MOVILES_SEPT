@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:frontend/models/diet_model.dart';
 
+// ─── Colores ──────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
 const _cardDark = Color(0xFF1A1A1A);
 const _orange = Color(0xFFFF5500);
@@ -59,11 +60,10 @@ class _DietDetailScreenState extends State<DietDetailScreen>
     widget.onAddToMyDiet(widget.diet);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${widget.diet.name} added to My Diets!'),
+        content: Text('¡${widget.diet.name} añadida a Mis Dietas!'),
         backgroundColor: const Color(0xFF22C55E),
         behavior: SnackBarBehavior.floating,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -76,13 +76,13 @@ class _DietDetailScreenState extends State<DietDetailScreen>
       backgroundColor: _bg,
       body: Stack(
         children: [
-          // ── Hero image (top half) ─────────────────────────────────────────
+          // ── Imagen Principal (Mitad superior) ───────────────────────────────
           SizedBox(
             height: MediaQuery.of(context).size.height * 0.42,
             width: double.infinity,
             child: _DietHeroImage(dietName: d.name),
           ),
-          // ── Back + menu buttons ───────────────────────────────────────────
+          // ── Botones de Atrás y Menú ─────────────────────────────────────────
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -98,7 +98,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
               ),
             ),
           ),
-          // ── Slide-up content card ─────────────────────────────────────────
+          // ── Tarjeta de Contenido Deslizable ─────────────────────────────────
           Align(
             alignment: Alignment.bottomCenter,
             child: SlideTransition(
@@ -112,7 +112,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                 ),
                 child: Column(
                   children: [
-                    // Drag handle
+                    // Indicador de arrastre (Drag handle)
                     Container(
                       margin: const EdgeInsets.only(top: 12, bottom: 4),
                       width: 36,
@@ -128,7 +128,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Title
+                            // Título
                             Text(
                               d.name,
                               style: const TextStyle(
@@ -139,7 +139,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                               ),
                             ),
                             const SizedBox(height: 10),
-                            // Description
+                            // Descripción
                             Text(
                               d.description,
                               style: const TextStyle(
@@ -149,12 +149,12 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                               ),
                             ),
                             const SizedBox(height: 20),
-                            // 4 macro cards
+                            // 4 tarjetas de macronutrientes
                             Row(
                               children: [
                                 Expanded(
                                   child: _macroCard(
-                                    'Calories',
+                                    'Calorías',
                                     '${d.calories} kcal',
                                     null,
                                     _purple,
@@ -164,7 +164,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: _macroCard(
-                                    'Protein',
+                                    'Proteína',
                                     '${d.proteinGrams}g',
                                     d.proteinPercent / 100,
                                     _green,
@@ -178,7 +178,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                               children: [
                                 Expanded(
                                   child: _macroCard(
-                                    'Carbs',
+                                    'Carbohidratos',
                                     '${d.carbsGrams}g',
                                     d.carbsPercent / 100,
                                     _yellow,
@@ -188,7 +188,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: _macroCard(
-                                    'Fat',
+                                    'Grasas',
                                     '${d.fatGrams}g',
                                     d.fatPercent / 100,
                                     _redOrange,
@@ -198,7 +198,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                               ],
                             ),
                             const SizedBox(height: 20),
-                            // Goal section
+                            // Sección de Meta
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
@@ -210,7 +210,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                                   Container(
                                     width: 36,
                                     height: 36,
-                                    decoration: BoxDecoration(
+                                    decoration: const BoxDecoration(
                                       color: _bg,
                                       shape: BoxShape.circle,
                                     ),
@@ -226,7 +226,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                                           CrossAxisAlignment.start,
                                       children: [
                                         const Text(
-                                          'Goal',
+                                          'Meta',
                                           style: TextStyle(
                                             color: _textSub,
                                             fontSize: 12,
@@ -247,7 +247,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                               ),
                             ),
                             const SizedBox(height: 16),
-                            // Daily breakdown preview
+                            // Vista previa del desglose diario
                             _buildDailyBreakdown(d),
                           ],
                         ),
@@ -258,7 +258,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
               ),
             ),
           ),
-          // ── Add to My Diet button ─────────────────────────────────────────
+          // ── Botón Añadir a Mi Dieta ─────────────────────────────────────────
           Positioned(
             bottom: 24,
             left: 20,
@@ -285,7 +285,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
                   ),
                   child: Center(
                     child: Text(
-                      _added ? '✓ Added to My Diet' : 'Add to My Diet',
+                      _added ? '✓ Añadida a Mi Dieta' : 'Añadir a Mi Dieta',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -302,7 +302,7 @@ class _DietDetailScreenState extends State<DietDetailScreen>
     );
   }
 
-  // ── Macro card ──────────────────────────────────────────────────────────────
+  // ── Tarjeta de Macronutrientes ──────────────────────────────────────────────
   Widget _macroCard(
     String label,
     String value,
@@ -357,26 +357,24 @@ class _DietDetailScreenState extends State<DietDetailScreen>
     );
   }
 
-  // ── Daily breakdown ─────────────────────────────────────────────────────────
+  // ── Desglose Diario ─────────────────────────────────────────────────────────
   Widget _buildDailyBreakdown(Diet d) {
     final meals = [
-      _MealInfo('Breakfast', '7:00 – 9:00 AM',
+      _MealInfo('Desayuno', '7:00 – 9:00 AM',
           '${(d.calories * 0.25).toInt()} kcal', Icons.wb_sunny_rounded),
-      _MealInfo('Lunch', '12:00 – 1:30 PM',
+      _MealInfo('Almuerzo', '12:00 – 1:30 PM',
           '${(d.calories * 0.35).toInt()} kcal', Icons.lunch_dining_rounded),
-      _MealInfo('Snack', '4:00 – 5:00 PM',
-          '${(d.calories * 0.10).toInt()} kcal',
-          Icons.apple_rounded),
-      _MealInfo('Dinner', '7:00 – 8:30 PM',
-          '${(d.calories * 0.30).toInt()} kcal',
-          Icons.dinner_dining_rounded),
+      _MealInfo('Merienda', '4:00 – 5:00 PM',
+          '${(d.calories * 0.10).toInt()} kcal', Icons.apple_rounded),
+      _MealInfo('Cena', '7:00 – 8:30 PM',
+          '${(d.calories * 0.30).toInt()} kcal', Icons.dinner_dining_rounded),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Daily Meal Schedule',
+          'Horario Diario de Comidas',
           style: TextStyle(
             color: Colors.white,
             fontSize: 16,
@@ -432,14 +430,14 @@ class _DietDetailScreenState extends State<DietDetailScreen>
     );
   }
 
-  // ── Circle button ───────────────────────────────────────────────────────────
+  // ── Botón Circular ──────────────────────────────────────────────────────────
   Widget _circleButton(IconData icon, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 38,
         height: 38,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Colors.black45,
           shape: BoxShape.circle,
         ),
@@ -457,35 +455,38 @@ class _MealInfo {
   _MealInfo(this.name, this.time, this.kcal, this.icon);
 }
 
-// ─── Hero image ───────────────────────────────────────────────────────────────
+// ─── Imagen Principal (Hero) ──────────────────────────────────────────────────
 class _DietHeroImage extends StatelessWidget {
   final String dietName;
   const _DietHeroImage({required this.dietName});
 
   @override
   Widget build(BuildContext context) {
+    // NOTA: Las claves han sido traducidas al español. 
+    // Asegúrate de que los nombres en 'd.name' coincidan con estas traducciones.
     final gradients = {
-      'Mediterranean Lifestyle': [
+      'Estilo de Vida Mediterráneo': [
         const Color(0xFF1A3A1A),
         const Color(0xFF2E5A2E),
         const Color(0xFF4A7C3A),
       ],
-      'Low-Carb Fat Burner': [
+      'Quemador de Grasa Bajo en Carbos': [
         const Color(0xFF1A2A1A),
         const Color(0xFF2A4A30),
         const Color(0xFF3A6A40),
       ],
-      'Vegan Vitality': [
+      'Vitalidad Vegana': [
         const Color(0xFF0A2A1A),
         const Color(0xFF1A4A2A),
         const Color(0xFF2A6A3A),
       ],
-      'Diabetic Balance Plan': [
+      'Plan de Equilibrio Diabético': [
         const Color(0xFF1A2A3A),
         const Color(0xFF2A3A5A),
         const Color(0xFF3A5A7A),
       ],
     };
+    
     final colors = gradients[dietName] ??
         [const Color(0xFF1A1A2A), const Color(0xFF2A2A3A), const Color(0xFF3A3A4A)];
 
@@ -499,7 +500,7 @@ class _DietHeroImage extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // decorative circles
+          // Círculos decorativos
           Positioned(
             top: -30,
             right: -30,

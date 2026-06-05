@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/models/diet_model.dart';
 import 'package:frontend/screens/alimentacion/diet_detail_screen.dart';
 
+// ─── Colores ──────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
 const _card = Color(0xFF1A1A1A);
 const _orange = Color(0xFFFF5500);
@@ -16,7 +17,7 @@ class DietsScreen extends StatefulWidget {
 }
 
 class _DietsScreenState extends State<DietsScreen> {
-  int _selectedTab = 0; // 0=All Diets, 1=My Diets
+  int _selectedTab = 0; // 0=Todas las Dietas, 1=Mis Dietas
 
   List<Diet> get _myDiets => mockAllDiets.where((d) => d.isMyDiet).toList();
 
@@ -46,7 +47,7 @@ class _DietsScreenState extends State<DietsScreen> {
     );
   }
 
-  // ── Header ──────────────────────────────────────────────────────────────────
+  // ── Cabecera (Header) ───────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -54,7 +55,7 @@ class _DietsScreenState extends State<DietsScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
-            'Diets',
+            'Dietas',
             style: TextStyle(
               color: Colors.white,
               fontSize: 28,
@@ -77,7 +78,7 @@ class _DietsScreenState extends State<DietsScreen> {
     );
   }
 
-  // ── Tab selector ────────────────────────────────────────────────────────────
+  // ── Selector de Pestañas (Tab selector) ─────────────────────────────────────
   Widget _buildTabSelector() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -87,8 +88,8 @@ class _DietsScreenState extends State<DietsScreen> {
       ),
       child: Row(
         children: [
-          _tabOption('All Diets', 0),
-          _tabOption('My Diets', 1),
+          _tabOption('Todas las Dietas', 0),
+          _tabOption('Mis Dietas', 1),
         ],
       ),
     );
@@ -121,7 +122,7 @@ class _DietsScreenState extends State<DietsScreen> {
     );
   }
 
-  // ── All Diets tab ───────────────────────────────────────────────────────────
+  // ── Pestaña Todas las Dietas ────────────────────────────────────────────────
   Widget _buildAllDietsTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -140,7 +141,7 @@ class _DietsScreenState extends State<DietsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Explore Diet Plans',
+                  'Explora Planes de Dieta',
                   style: TextStyle(
                     color: Color(0xFF3B0764),
                     fontSize: 18,
@@ -149,7 +150,7 @@ class _DietsScreenState extends State<DietsScreen> {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'Personalized plans to match your goals and lifestyle.',
+                  'Planes personalizados para adaptarse a tus metas y estilo de vida.',
                   style: TextStyle(color: Color(0xFF4B0082), fontSize: 14),
                 ),
               ],
@@ -157,7 +158,7 @@ class _DietsScreenState extends State<DietsScreen> {
           ),
           const SizedBox(height: 24),
           const Text(
-            'Diets',
+            'Dietas',
             style: TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -172,7 +173,7 @@ class _DietsScreenState extends State<DietsScreen> {
     );
   }
 
-  // ── My Diets tab ────────────────────────────────────────────────────────────
+  // ── Pestaña Mis Dietas ──────────────────────────────────────────────────────
   Widget _buildMyDietsTab() {
     if (_myDiets.isEmpty) {
       return _buildEmptyMyDiets();
@@ -183,7 +184,7 @@ class _DietsScreenState extends State<DietsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'My Plans',
+            'Mis Planes',
             style: TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -198,17 +199,17 @@ class _DietsScreenState extends State<DietsScreen> {
     );
   }
 
-  // ── Empty state ─────────────────────────────────────────────────────────────
+  // ── Estado vacío (Empty state) ──────────────────────────────────────────────
   Widget _buildEmptyMyDiets() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Illustration placeholder
+          // Espacio para la ilustración
           Container(
             width: 200,
             height: 200,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: _card,
               shape: BoxShape.circle,
             ),
@@ -218,7 +219,7 @@ class _DietsScreenState extends State<DietsScreen> {
           ),
           const SizedBox(height: 32),
           const Text(
-            'No Diet Plans Yet.',
+            'Aún no hay Planes de Dieta.',
             style: TextStyle(
               color: Colors.white,
               fontSize: 22,
@@ -227,7 +228,7 @@ class _DietsScreenState extends State<DietsScreen> {
           ),
           const SizedBox(height: 10),
           const Text(
-            'Start a personalized diet to make\ntracking even easier.',
+            'Inicia una dieta personalizada para hacer\nel seguimiento aún más fácil.',
             textAlign: TextAlign.center,
             style: TextStyle(color: _textSub, fontSize: 14, height: 1.5),
           ),
@@ -242,7 +243,7 @@ class _DietsScreenState extends State<DietsScreen> {
                 borderRadius: BorderRadius.circular(40),
               ),
               child: const Text(
-                'Explore Diets',
+                'Explorar Dietas',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -256,7 +257,7 @@ class _DietsScreenState extends State<DietsScreen> {
     );
   }
 
-  // ── Diet card ───────────────────────────────────────────────────────────────
+  // ── Tarjeta de Dieta ────────────────────────────────────────────────────────
   Widget _buildDietCard(Diet diet, {bool showRemove = false}) {
     return GestureDetector(
       onTap: () {
@@ -281,7 +282,7 @@ class _DietsScreenState extends State<DietsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image area
+            // Área de la imagen
             ClipRRect(
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(20)),
@@ -323,7 +324,7 @@ class _DietsScreenState extends State<DietsScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Text(
-                              'Remove',
+                              'Quitar',
                               style: TextStyle(
                                   color: Colors.redAccent, fontSize: 12),
                             ),
@@ -336,9 +337,9 @@ class _DietsScreenState extends State<DietsScreen> {
                     spacing: 12,
                     children: [
                       _macroChip('${diet.calories} kcal'),
-                      _macroChip('Protein: ${diet.proteinGrams}g'),
-                      _macroChip('Carbs: ${diet.carbsGrams}g'),
-                      _macroChip('Fat: ${diet.fatGrams}g'),
+                      _macroChip('Proteína: ${diet.proteinGrams}g'),
+                      _macroChip('Carbos: ${diet.carbsGrams}g'),
+                      _macroChip('Grasas: ${diet.fatGrams}g'),
                     ],
                   ),
                 ],
@@ -358,24 +359,28 @@ class _DietsScreenState extends State<DietsScreen> {
   }
 }
 
-// ─── Diet image placeholder ───────────────────────────────────────────────────
+// ─── Placeholder de imagen de Dieta ───────────────────────────────────────────
 class _DietImagePlaceholder extends StatelessWidget {
   final String dietName;
   const _DietImagePlaceholder({required this.dietName});
 
   @override
   Widget build(BuildContext context) {
+    // NOTA: Se actualizaron las claves al español para que coincidan con la traducción.
     final colors = {
-      'Mediterranean Lifestyle': [
+      'Estilo de Vida Mediterráneo': [
         const Color(0xFF2D5016),
         const Color(0xFF4A7C24)
       ],
-      'Low-Carb Fat Burner': [
+      'Quemador de Grasa Bajo en Carbos': [
         const Color(0xFF1A3A2A),
         const Color(0xFF2E6644)
       ],
-      'Vegan Vitality': [const Color(0xFF1A3320), const Color(0xFF2A5530)],
-      'Diabetic Balance Plan': [
+      'Vitalidad Vegana': [
+        const Color(0xFF1A3320), 
+        const Color(0xFF2A5530)
+      ],
+      'Plan de Equilibrio Diabético': [
         const Color(0xFF1A2A40),
         const Color(0xFF2A4A6A)
       ],
@@ -412,7 +417,7 @@ class _DietImagePlaceholder extends StatelessWidget {
   }
 }
 
-// ─── Empty state SVG-style illustration ──────────────────────────────────────
+// ─── Ilustración del estado vacío (estilo SVG) ────────────────────────────────
 class _EmptyStateIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -429,11 +434,11 @@ class _EmptyPainter extends CustomPainter {
     final cx = size.width / 2;
     final cy = size.height / 2;
 
-    // Moon/circle background
+    // Fondo círculo/luna
     final bgPaint = Paint()..color = const Color(0xFF2A2A2A);
     canvas.drawCircle(Offset(cx, cy + 10), 40, bgPaint);
 
-    // Person body
+    // Cuerpo de la persona
     final bodyPaint = Paint()..color = const Color(0xFF4A4A5A);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -443,10 +448,10 @@ class _EmptyPainter extends CustomPainter {
       bodyPaint,
     );
 
-    // Person head
+    // Cabeza de la persona
     canvas.drawCircle(Offset(cx, cy - 16), 12, bodyPaint);
 
-    // Leaves
+    // Hojas
     final leafPaint = Paint()..color = const Color(0xFF3A3A4A);
     canvas.drawOval(
         Rect.fromCenter(

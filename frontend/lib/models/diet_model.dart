@@ -54,14 +54,14 @@ class FoodEntry {
   });
 }
 
-// ─── Mock Data ───────────────────────────────────────────────────────────────
+// ─── Datos Simulados (Mock Data) ──────────────────────────────────────────────
 
 final List<Diet> mockAllDiets = [
   Diet(
     id: 1,
-    name: 'Mediterranean Lifestyle',
+    name: 'Estilo de Vida Mediterráneo',
     description:
-        'This diet focuses on whole foods, featuring fresh vegetables, quality olive oil, lean fish, nutritious nuts, and wholesome grains. It offers a balanced and tasty way to eat that supports your health.',
+        'Esta dieta se centra en alimentos integrales, incluyendo verduras frescas, aceite de oliva de calidad, pescado magro, nueces nutritivas y cereales integrales. Ofrece una forma equilibrada y sabrosa de comer que favorece tu salud.',
     imageAsset: 'mediterranean',
     calories: 2000,
     proteinPercent: 25,
@@ -70,13 +70,13 @@ final List<Diet> mockAllDiets = [
     proteinGrams: 120,
     carbsGrams: 200,
     fatGrams: 70,
-    goal: 'Heart Health, Weight Maintenance',
+    goal: 'Salud Cardiovascular, Mantenimiento de Peso',
   ),
   Diet(
     id: 2,
-    name: 'Low-Carb Fat Burner',
+    name: 'Quemador de Grasa Bajo en Carbos',
     description:
-        'A ketogenic-inspired plan that limits carbohydrates and prioritizes healthy fats and proteins. Ideal for blood sugar management and fat loss.',
+        'Un plan de inspiración cetogénica que limita los carbohidratos y prioriza las grasas saludables y las proteínas. Ideal para el control del azúcar en sangre y la pérdida de grasa.',
     imageAsset: 'lowcarb',
     calories: 1800,
     proteinPercent: 35,
@@ -85,13 +85,13 @@ final List<Diet> mockAllDiets = [
     proteinGrams: 160,
     carbsGrams: 100,
     fatGrams: 80,
-    goal: 'Blood Sugar Control, Weight Loss',
+    goal: 'Control de Azúcar en Sangre, Pérdida de Peso',
   ),
   Diet(
     id: 3,
-    name: 'Vegan Vitality',
+    name: 'Vitalidad Vegana',
     description:
-        'A plant-based plan rich in legumes, vegetables, fruits and whole grains. High in fiber and antioxidants, supporting long-term wellness.',
+        'Un plan basado en plantas rico en legumbres, verduras, frutas y cereales integrales. Alto en fibra y antioxidantes, apoyando el bienestar a largo plazo.',
     imageAsset: 'vegan',
     calories: 2000,
     proteinPercent: 25,
@@ -100,14 +100,14 @@ final List<Diet> mockAllDiets = [
     proteinGrams: 125,
     carbsGrams: 300,
     fatGrams: 55,
-    goal: 'Anti-inflammation, Energy Boost',
+    goal: 'Antiinflamatorio, Impulso de Energía',
     isMyDiet: true,
   ),
   Diet(
     id: 4,
-    name: 'Diabetic Balance Plan',
+    name: 'Plan de Equilibrio Diabético',
     description:
-        'Specifically designed for type II diabetes management. Low glycemic index foods, balanced macros, and steady energy release throughout the day.',
+        'Diseñado específicamente para el manejo de la diabetes tipo II. Incluye alimentos de bajo índice glucémico, macros equilibrados y liberación constante de energía durante todo el día.',
     imageAsset: 'diabetic',
     calories: 1700,
     proteinPercent: 30,
@@ -116,11 +116,11 @@ final List<Diet> mockAllDiets = [
     proteinGrams: 130,
     carbsGrams: 170,
     fatGrams: 57,
-    goal: 'Glucose Control, Steady Energy',
+    goal: 'Control de Glucosa, Energía Constante',
   ),
 ];
 
-// Calorie trend data: [goal line, actual consumption] for Mon–Sun
+// Datos de tendencias de calorías: [línea de meta, consumo real] para Lunes–Domingo
 final List<double> goalCalories = [300, 280, 310, 250, 290, 260, 300];
 final List<double> actualCalories = [220, 310, 390, 160, 300, 220, 250];
 

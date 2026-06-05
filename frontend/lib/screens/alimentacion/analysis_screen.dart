@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:frontend/models/diet_model.dart';
 
-// ─── Colors ──────────────────────────────────────────────────────────────────
+// ─── Colores ──────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
 const _card = Color(0xFF1A1A1A);
 const _orange = Color(0xFFFF5500);
@@ -20,10 +20,10 @@ class AnalysisScreen extends StatefulWidget {
 }
 
 class _AnalysisScreenState extends State<AnalysisScreen> {
-  int _selectedPeriod = 0; // 0=Daily, 1=Weekly, 2=Monthly
-  final List<String> _periods = ['Daily', 'Weekly', 'Monthly'];
+  int _selectedPeriod = 0; // 0=Diario, 1=Semanal, 2=Mensual
+  final List<String> _periods = ['Diario', 'Semanal', 'Mensual'];
 
-  // Totals calculated from mock entries
+  // Totales calculados a partir de registros simulados (mock entries)
   double get _totalCalories =>
       mockTodayEntries.fold(0, (s, e) => s + e.calories);
   double get _totalCarbs => mockTodayEntries.fold(0, (s, e) => s + e.carbs);
@@ -31,7 +31,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       mockTodayEntries.fold(0, (s, e) => s + e.proteins);
   double get _totalFats => mockTodayEntries.fold(0, (s, e) => s + e.fats);
 
-  // Macro percentages
+  // Porcentajes de Macronutrientes
   double get _totalMacroG => _totalCarbs + _totalProteins + _totalFats;
   double get _proteinPct =>
       _totalMacroG > 0 ? (_totalProteins / _totalMacroG * 100) : 0;
@@ -75,7 +75,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  // ── Header ──────────────────────────────────────────────────────────────────
+  // ── Cabecera (Header) ───────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -83,7 +83,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
-            'Analysis',
+            'Análisis',
             style: TextStyle(
               color: Colors.white,
               fontSize: 28,
@@ -106,7 +106,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  // ── Banner ──────────────────────────────────────────────────────────────────
+  // ── Tarjeta de Anuncio (Banner) ─────────────────────────────────────────────
   Widget _buildBannerCard() {
     return Container(
       width: double.infinity,
@@ -119,7 +119,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Your Nutrition Analysis',
+            'Tu Análisis Nutricional',
             style: TextStyle(
               color: Color(0xFF14532D),
               fontSize: 18,
@@ -128,7 +128,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           ),
           SizedBox(height: 6),
           Text(
-            'Track trends. Spot patterns. Crush your goals.',
+            'Sigue tendencias. Detecta patrones. Alcanza tus metas.',
             style: TextStyle(
               color: Color(0xFF166534),
               fontSize: 14,
@@ -139,7 +139,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  // ── Period selector ─────────────────────────────────────────────────────────
+  // ── Selector de Período ─────────────────────────────────────────────────────
   Widget _buildPeriodSelector() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -179,7 +179,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  // ── Calorie trends chart ────────────────────────────────────────────────────
+  // ── Gráfico de Tendencias de Calorías ───────────────────────────────────────
   Widget _buildCalorieTrendsCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -191,7 +191,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Calorie Trends',
+            'Tendencias de Calorías',
             style: TextStyle(
               color: Color(0xFF3B0764),
               fontSize: 17,
@@ -209,9 +209,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _chartLegend(_orange, '5 days under goal'),
+              _chartLegend(_orange, '5 días bajo la meta'),
               const SizedBox(width: 16),
-              _chartLegend(Colors.black87, '2 days over by more than 200 kcal'),
+              _chartLegend(Colors.black87, '2 días excedidos por más de 200 kcal'),
             ],
           ),
         ],
@@ -236,7 +236,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  // ── Macro distribution ──────────────────────────────────────────────────────
+  // ── Distribución de Macronutrientes ─────────────────────────────────────────
   Widget _buildMacroDistributionCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -248,7 +248,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Macro Distribution',
+            'Distribución de Macros',
             style: TextStyle(
               color: Color(0xFF713F12),
               fontSize: 17,
@@ -258,10 +258,10 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           const SizedBox(height: 4),
           Text(
             _proteinPct < 25
-                ? "You're consistently low on protein."
+                ? "Estás consistentemente bajo en proteínas."
                 : _carbsPct > 55
-                    ? "Carb intake is above your daily goal."
-                    : "Your macros look balanced today!",
+                    ? "El consumo de carbohidratos supera tu meta diaria."
+                    : "¡Tus macros lucen equilibrados hoy!",
             style: const TextStyle(color: Color(0xFF92400E), fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -269,7 +269,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             children: [
               Expanded(
                 child: _macroCard(
-                  'Fats',
+                  'Grasas',
                   '${_totalFats.toStringAsFixed(1)}g',
                   _fatsPct / 100,
                   _redOrange,
@@ -279,7 +279,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: _macroCard(
-                  'Carbs',
+                  'Carbos',
                   '${_totalCarbs.toStringAsFixed(1)}g',
                   _carbsPct / 100,
                   _green,
@@ -289,7 +289,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: _macroCard(
-                  'Protein',
+                  'Proteína',
                   '${_totalProteins.toStringAsFixed(1)}g',
                   _proteinPct / 100,
                   _purple,
@@ -299,7 +299,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          // Calories summary
+          // Resumen de calorías
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -313,7 +313,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Total Today',
+                      'Total de Hoy',
                       style: TextStyle(
                         color: Color(0xFF92400E),
                         fontSize: 12,
@@ -329,14 +329,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     ),
                   ],
                 ),
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text(
-                      'Goal',
+                    Text(
+                      'Meta',
                       style: TextStyle(color: Color(0xFF92400E), fontSize: 12),
                     ),
-                    const Text(
+                    Text(
                       '1,800 kcal',
                       style: TextStyle(
                         color: Color(0xFF713F12),
@@ -416,7 +416,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  // ── Today's food log ────────────────────────────────────────────────────────
+  // ── Registro de Comidas de Hoy ──────────────────────────────────────────────
   Widget _buildTodayLogSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,14 +425,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              "Today's Log",
+              "Registro de Hoy",
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            Text('${mockTodayEntries.length} items',
+            Text('${mockTodayEntries.length} elementos',
                 style: const TextStyle(color: _textSub, fontSize: 13)),
           ],
         ),
@@ -506,7 +506,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 }
 
-// ─── Custom Line Chart ────────────────────────────────────────────────────────
+// ─── Gráfico de Líneas Personalizado ──────────────────────────────────────────
 class _CalorieLineChart extends StatelessWidget {
   final List<double> goalData;
   final List<double> actualData;
@@ -523,7 +523,7 @@ class _CalorieLineChart extends StatelessWidget {
       painter: _LineChartPainter(
         goalData: goalData,
         actualData: actualData,
-        labels: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        labels: const ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
         yLabels: const ['100', '200', '300', '400'],
       ),
     );
@@ -555,7 +555,7 @@ class _LineChartPainter extends CustomPainter {
     final double minY = 0;
     final double maxY = 450;
 
-    // Y-axis lines
+    // Líneas del eje Y
     final gridPaint = Paint()
       ..color = const Color(0xFF4B0082).withOpacity(0.2)
       ..strokeWidth = 1;
@@ -567,7 +567,7 @@ class _LineChartPainter extends CustomPainter {
         Offset(leftPad + chartW, y),
         gridPaint,
       );
-      // Y labels
+      // Etiquetas del eje Y
       final tp = TextPainter(
         text: TextSpan(
           text: '${(i * 100).toInt()}',
@@ -578,7 +578,7 @@ class _LineChartPainter extends CustomPainter {
       tp.paint(canvas, Offset(0, y - tp.height / 2));
     }
 
-    // X labels
+    // Etiquetas del eje X
     for (int i = 0; i < labels.length; i++) {
       final x = leftPad + chartW * i / (labels.length - 1);
       final tp = TextPainter(
@@ -622,7 +622,7 @@ class _LineChartPainter extends CustomPainter {
     drawSmoothLine(goalData, const Color(0xFF1A1A1A));
     drawSmoothLine(actualData, _orange);
 
-    // Dots on actual
+    // Puntos sobre los datos reales
     final dotPaint = Paint()..color = _orange;
     for (int i = 0; i < actualData.length; i++) {
       canvas.drawCircle(Offset(mapX(i), mapY(actualData[i])), 3, dotPaint);
