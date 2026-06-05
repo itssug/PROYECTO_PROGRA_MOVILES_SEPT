@@ -63,7 +63,7 @@ class OnboardingScreen1 extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.black,
                   shape: const CircleBorder(),
-                  padding: const EdgeInsets.all(22),
+                  padding: const EdgeInsets.all(2),
                 ),
 
                 child: const Icon(
