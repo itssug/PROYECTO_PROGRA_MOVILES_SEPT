@@ -316,7 +316,7 @@ class Usuarios(models.Model):
     sexo = models.CharField(max_length=9, blank=True, null=True)
     peso = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
     altura = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
-    #imc = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
+    imc = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
     anios_diagnostico = models.IntegerField(blank=True, null=True)
     hba1c_inicial = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
     usa_insulina = models.IntegerField(blank=True, null=True)
