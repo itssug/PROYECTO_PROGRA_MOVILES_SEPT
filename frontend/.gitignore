@@ -1,54 +1,45 @@
-# =========================
-# PYTHON / DJANGO
-# =========================
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Entornos virtuales
-venv/
-env/
-.venv/
-
-# Variables de entorno
-.env
-
-# Base de datos SQLite
-db.sqlite3
-
-# Archivos estáticos/cache
+# Miscellaneous
+*.class
 *.log
-media/
-staticfiles/
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
 
-# Migraciones compiladas
-*.pyo
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
 
-# =========================
-# FLUTTER / DART
-# =========================
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
 .dart_tool/
-.packages
-.pub/
-build/
-
-# Flutter generated
 .flutter-plugins
 .flutter-plugins-dependencies
-.flutter-versions
 .pub-cache/
+.pub/
+/build/
 
-# Android Studio / VSCode
-.idea/
-.vscode/
+# Symbolication related
+app.*.symbols
 
-# MacOS
-.DS_Store
+# Obfuscation related
+app.*.map.json
 
-# Windows
-Thumbs.db
-
-**/__pycache__/
-*.py[cod]
-*.pyc
-*.pyo
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
