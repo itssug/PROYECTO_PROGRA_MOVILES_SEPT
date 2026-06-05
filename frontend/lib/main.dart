@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'services/api_service.dart';
+import 'screens/alimentacion/alimentacion_nav_shell.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,54 +11,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Home(),
-    );
-  }
-}
-
-class Home extends StatefulWidget {
-  @override
-  State<Home> createState() => _HomeState();
-}
-
-class _HomeState extends State<Home> {
-
-  String mensaje = "Cargando...";
-
-  @override
-  void initState() {
-    super.initState();
-    obtenerDatos();
-  }
-
-  Future<void> obtenerDatos() async {
-
-    try {
-
-      final res = await ApiService.test();
-
-      setState(() {
-        mensaje = res;
-      });
-
-    } catch (e) {
-
-      setState(() {
-        mensaje = "Error: $e";
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Prueba API"),
+      title: 'GlucosaApp',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFFF5500),
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
       ),
-      body: Center(
-        child: Text(mensaje),
-      ),
+      home: const AlimentacionNavShell(),
     );
   }
 }
