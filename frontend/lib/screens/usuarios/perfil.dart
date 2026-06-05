@@ -77,7 +77,14 @@ class _PerfilScreenState extends State<PerfilScreen> {
   Widget build(BuildContext context) {
     final usuario = AuthService.usuario ?? {};
 
-    return Stack(
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        title: const Text('Mi Perfil', style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+      ),
+      body: Stack(
       children: [
         SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -301,6 +308,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
           ),
         ),
       ],
+    ),
     );
   }
 

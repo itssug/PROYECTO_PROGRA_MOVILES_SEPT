@@ -1,19 +1,10 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:async';
 
 class ApiService {
-
-  static const String baseUrl =
-      "http://localhost:8000/api";
-
+  // Simulación de conexión para el test inicial sin usar localhost
   static Future<String> test() async {
-
-    final response = await http.get(
-      Uri.parse('$baseUrl/test/')
-    );
-
-    final data = jsonDecode(response.body);
-
-    return data['mensaje'];
+    // Retraso artificial simulando conexión de red
+    await Future.delayed(const Duration(seconds: 1));
+    return "Conexión local simulada exitosa (Backend Hardcodeado)";
   }
 }

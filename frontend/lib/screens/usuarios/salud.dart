@@ -17,20 +17,18 @@ class SaludScreen extends StatelessWidget {
       usuario['altura'],
     );
 
-    return SingleChildScrollView(
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        backgroundColor: AppColors.surface,
+        title: const Text('Mi Salud', style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Mi Salud',
-            style: TextStyle(
-              color: AppColors.textPrim,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 20),
 
           // Tarjeta de IMC
           Container(
@@ -135,6 +133,7 @@ class SaludScreen extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 
