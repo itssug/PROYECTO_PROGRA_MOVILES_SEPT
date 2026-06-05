@@ -1,78 +1,83 @@
-# ============================================================
-# ARCHIVO: core/serializers.py
-# ============================================================
+
 from rest_framework import serializers
-from .models import Usuarios
-import hashlib
-from django.db import connection
+from .models import ActividadFisica
 
 
-class RegistroSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8)
-    confirmar_password = serializers.CharField(write_only=True)
+TIPOS_VALIDOS = [
+    'caminata', 'trote', 'ciclismo', 'natacion', 'pesas',
+    'yoga', 'baile', 'futbol', 'otro_aerobico', 'otro_anaerobico',
+]
+
+INTENSIDADES_VALIDAS = ['leve', 'moderada', 'intensa']
+
+
+class ActividadFisicaSerializer(serializers.ModelSerializer):
+    """
+    Serializer completo para el CRUD de actividades físicas.
+    Valida tipos, intensidades y rangos de valores.
+    """
 
     class Meta:
-        model = Usuarios
+        model = ActividadFisica
         fields = [
-            'nombre', 'email', 'password', 'confirmar_password',
-            'fecha_nacimiento', 'sexo', 'peso', 'altura',
-            'anios_diagnostico', 'hba1c_inicial', 'usa_insulina',
-            'tiene_hipertension', 'tiene_dislipidemia', 'es_fumador',
-            'nivel_actividad_base',
+            'id', 'usuario_id', 'tipo', 'intensidad', 'duracion',
+            'calorias_quemadas', 'pasos', 'frecuencia_cardiaca_prom',
+            'fecha', 'hora_inicio', 'glucosa_pre', 'glucosa_post', 'notas',
         ]
+        read_only_fields = ['id', 'usuario_id']
 
-    def validate_email(self, value):
-        if Usuarios.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Este correo ya está registrado.")
-        return value.lower()
+    def validate_tipo(self, value):
+        if value not in TIPOS_VALIDOS:
+            raise serializers.ValidationError(
+                f'Tipo inválido. Opciones: {", ".join(TIPOS_VALIDOS)}'
+            )
+        return value
 
-    def validate(self, data):
-        if data['password'] != data['confirmar_password']:
-            raise serializers.ValidationError({"confirmar_password": "Las contraseñas no coinciden."})
-        return data
+    def validate_intensidad(self, value):
+        if value and value not in INTENSIDADES_VALIDAS:
+            raise serializers.ValidationError(
+                f'Intensidad inválida. Opciones: {", ".join(INTENSIDADES_VALIDAS)}'
+            )
+        return value
 
-    def create(self, validated_data):
-        validated_data.pop('confirmar_password')
-        raw_password = validated_data.pop('password')
-        # SHA-256 simple — reemplaza con make_password si usas django.contrib.auth
-        validated_data['password'] = hashlib.sha256(raw_password.encode()).hexdigest()
-        usuario = Usuarios.objects.create(**validated_data)
-        return usuario
+    def validate_duracion(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('La duración debe ser mayor a 0 minutos.')
+        if value > 720:
+            raise serializers.ValidationError('La duración no puede exceder 720 minutos.')
+        return value
+
+    def validate_calorias_quemadas(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError('Las calorías no pueden ser negativas.')
+        return value
+
+    def validate_pasos(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError('Los pasos no pueden ser negativos.')
+        return value
+
+    def validate_glucosa_pre(self, value):
+        if value is not None and (value < 20 or value > 600):
+            raise serializers.ValidationError('Glucosa PRE fuera de rango (20-600 mg/dL).')
+        return value
+
+    def validate_glucosa_post(self, value):
+        if value is not None and (value < 20 or value > 600):
+            raise serializers.ValidationError('Glucosa POST fuera de rango (20-600 mg/dL).')
+        return value
 
 
-class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField()
+class ActividadFisicaListSerializer(serializers.ModelSerializer):
+    """Serializer simplificado para listas."""
+    calorias_quemadas = serializers.FloatField(default=0)
+    glucosa_pre = serializers.FloatField(allow_null=True)
+    glucosa_post = serializers.FloatField(allow_null=True)
 
-    def validate(self, data):
-        import hashlib
-        try:
-            usuario = Usuarios.objects.get(email=data['email'].lower())
-        except Usuarios.DoesNotExist:
-            raise serializers.ValidationError("Credenciales incorrectas.")
-
-        hashed = hashlib.sha256(data['password'].encode()).hexdigest()
-        if usuario.password != hashed:
-            raise serializers.ValidationError("Credenciales incorrectas.")
-
-        data['usuario'] = usuario
-        return data
-
-
-class UsuarioPublicoSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Usuarios
+        model = ActividadFisica
         fields = [
-            'id', 'nombre', 'email', 'fecha_nacimiento', 'sexo',
-            'peso', 'altura', 'anios_diagnostico',
-            'hba1c_inicial', 'usa_insulina', 'tiene_hipertension',
-            'tiene_dislipidemia', 'es_fumador', 'nivel_actividad_base',
-            'fecha_registro',
+            'id', 'tipo', 'intensidad', 'duracion',
+            'calorias_quemadas', 'pasos', 'frecuencia_cardiaca_prom',
+            'fecha', 'hora_inicio', 'glucosa_pre', 'glucosa_post', 'notas',
         ]
-        read_only_fields = ['id', 'fecha_registro']  # ← Solo estos dos
-
-    def get_imc(self, obj):
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT imc FROM usuarios WHERE id = %s", [obj.id])
-            row = cursor.fetchone()
-        return float(row[0]) if row and row[0] else None
