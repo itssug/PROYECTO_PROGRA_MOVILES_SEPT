@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/estado_emocional_model.dart';
 import '../models/registro_sueno_model.dart';
+import '../../../config/api_config.dart';
 
 class EstadoSuenoService {
-  static const String baseUrl = 'http://localhost:8000/api/estado-sueno';
+  static const String baseUrl = '${ApiConfig.baseUrl}/api/estado-sueno';
   // En dispositivo real: usa la IP de tu PC en la red local
 
   // ── Estado Emocional ──────────────────────────

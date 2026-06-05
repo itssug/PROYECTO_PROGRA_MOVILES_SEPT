@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import '../../../config/api_config.dart';
 
 class ActividadFisicaService {
-static const String baseUrl = 'http://localhost:8000/api';
+static const String baseUrl = '${ApiConfig.baseUrl}/api';
 
   static const int usuarioId = 1;
 
