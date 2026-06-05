@@ -116,6 +116,7 @@ class _HomeState extends State<Home> {
           ),
         ),
       ),
+      home: const AlimentacionNavShell(),
     );
   }
 }*/
