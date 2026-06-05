@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-2c8n($yo*d8jphm0x1z2b3#yfv=gfbzjyo*p!s+sqfnd2e1kks
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'core',
+    'estado_sueno',
 ]
 
 MIDDLEWARE = [
@@ -54,6 +55,7 @@ MIDDLEWARE = [
     
 ]
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'config.urls'
 
@@ -83,7 +85,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'glucosa_app',
         'USER': 'root',
-        'PASSWORD': '',
+        'PASSWORD': '2314266',
         'HOST': 'localhost',
         'PORT': '3306',
     }
