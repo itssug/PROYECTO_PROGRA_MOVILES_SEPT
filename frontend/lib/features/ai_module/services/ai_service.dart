@@ -5,18 +5,28 @@ class AIPredictionResult {
   final double predictedGlucose;
   final String riskLevel;
   final String modelUsed;
+  final List<String> avisos;
+  final bool fueraDeRango;
 
   AIPredictionResult({
     required this.predictedGlucose,
     required this.riskLevel,
     required this.modelUsed,
+    this.avisos = const [],
+    this.fueraDeRango = false,
   });
 
   factory AIPredictionResult.fromJson(Map<String, dynamic> json) {
     return AIPredictionResult(
-      predictedGlucose: json['glucosa_predicha'] != null ? double.parse(json['glucosa_predicha'].toString()) : 0.0,
+      predictedGlucose: json['glucosa_predicha'] != null
+          ? double.parse(json['glucosa_predicha'].toString())
+          : 0.0,
       riskLevel: json['riesgo'] ?? 'UNKNOWN',
       modelUsed: json['modelo_usado'] ?? 'unknown',
+      avisos: json['avisos'] != null
+          ? List<String>.from(json['avisos'])
+          : [],
+      fueraDeRango: json['fuera_de_rango'] ?? false,
     );
   }
 }
