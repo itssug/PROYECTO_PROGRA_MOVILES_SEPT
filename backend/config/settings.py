@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'analitica_ia',
     'ml_engine',
     'alimentacion',
+    'app',
 ]
 
 MIDDLEWARE = [
@@ -86,7 +87,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'glucosa_app',
+        'NAME': 'glucosa_final',
         'USER': 'root',
         'PASSWORD': '',
         'HOST': 'localhost',
