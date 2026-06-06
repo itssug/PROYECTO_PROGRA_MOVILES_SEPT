@@ -83,7 +83,7 @@ class _ChatScreenState extends State<ChatScreen>
   
       // ── Llamada al service tipado ─────────────────────────────────────────
       // Cambia userId: 1 por el ID real cuando tengas auth
-      final resp = await AIService.enviarMensaje(texto, userId: 1);
+      final resp = await AIService.enviarMensaje(texto, /* userId: 14 */);
   
       final msgAI = _Mensaje(
         role: resp.success ? _Rol.ai : _Rol.error,

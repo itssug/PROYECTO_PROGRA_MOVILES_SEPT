@@ -7,84 +7,108 @@ from .memory_service import MemoryService
 class AIService:
 
     def __init__(self):
-        self.client = genai.Client(
-            api_key=""  # ← nunca hardcodear la key
-        )
+        self.client = genai.Client(api_key="")
         self.query_service = QueryService()
         self.memory_service = MemoryService()
 
     def process_question(self, question: str, user_id: int) -> dict:
-        """
-        Recibe user_id (int) en vez del objeto User de Django,
-        así funciona con y sin autenticación.
-        """
 
-        # Guardar mensaje del usuario
-        self.memory_service.save_message(
-            user_id=user_id,
-            role="user",
-            message=question,
-        )
+        self.memory_service.save_message(user_id=user_id, role="user", message=question)
 
-        # Datos relevantes del paciente
-        patients = self.query_service.find_relevant_patients(question)
+        # Siempre trae el contexto del usuario, sin importar qué preguntó
+        context_data = self.query_service.get_user_context(user_id)
 
-        # Construir prompt
-        context = self._build_context(patients)
         history = self.memory_service.get_recent_history(user_id)
-        prompt  = self._build_prompt(question, context, history)
+        prompt  = self._build_prompt(question, context_data, history)
+        answer  = self._call_gemini(prompt)
 
-        # Llamar a Gemini
-        answer = self._call_gemini(prompt)
+        self.memory_service.save_message(user_id=user_id, role="assistant", message=answer)
 
-        # Guardar respuesta
-        self.memory_service.save_message(
-            user_id=user_id,
-            role="assistant",
-            message=answer,
-        )
+        return {"answer": answer}
 
-        # ← "answer" (no "respuesta") para que Flutter lo lea correctamente
-        return {
-            "answer": answer,
-            "patients": patients,
-        }
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
-
-    def _build_context(self, patients: list) -> str:
-        if not patients:
-            return "No hay datos relacionados."
-
-        lines = []
-        for p in patients:
-            lines.append(
-                f"ID: {p['id']} | Nombre: {p['nombre']} | "
-                f"Glucosa: {p['glucosa']} mg/dL | Peso: {p['peso']} kg"
-            )
-        return "\n".join(lines)
-
-    def _build_prompt(self, question: str, context: str, history: list) -> str:
+    def _build_prompt(self, question: str, context: dict, history: list) -> str:
         history_text = "\n".join(
             f"{h['role'].upper()}: {h['message']}" for h in history
-        )
+        ) or "Sin historial previo."
 
-        return f"""Eres un asistente especializado en diabetes tipo II.
+        perfil    = context.get("perfil", {})
+        g_hoy     = context.get("glucosa_hoy", [])
+        g_semana  = context.get("glucosa_semana", {})
+        g_global  = context.get("glucosa_global", {})
+        objetivos = context.get("objetivos", {})
+        
+
+        if g_hoy:
+            glucosa_hoy_text = "\n".join(
+                f"  - {r['hora']} → {r['nivel']} mg/dL ({r['tipo_medicion']}, {r['clasificacion']})"
+                for r in g_hoy
+            )
+        else:
+            glucosa_hoy_text = "  Sin mediciones registradas hoy."
+
+        if g_semana:
+            semana_text = (
+                f"  Promedio: {g_semana['promedio']} mg/dL | "
+                f"Máx: {g_semana['maximo']} | "
+                f"Mín: {g_semana['minimo']} | "
+                f"Mediciones: {g_semana['total_mediciones']} | "
+                f"Fuera de rango: {g_semana['fuera_de_rango']}"
+            )
+        else:
+            semana_text = "  Sin datos de la última semana."
+
+        if objetivos:
+            obj_text = (
+                f"  Glucosa en ayunas: {objetivos['glucosa_ayunas_min']}–{objetivos['glucosa_ayunas_max']} mg/dL\n"
+                f"  Glucosa postprandial: {objetivos['glucosa_post_min']}–{objetivos['glucosa_post_max']} mg/dL"
+            )
+        else:
+            obj_text = "  Sin objetivos definidos."
+        
+        if g_global:
+            global_text = (
+                f"  Promedio total: {g_global['promedio']} mg/dL | "
+                f"Máx total: {g_global['maximo']} | "
+                f"Mín total: {g_global['minimo']} | "
+                f"Mediciones totales: {g_global['total_mediciones']} | "
+                f"Fuera de rango total: {g_global['fuera_de_rango']}"
+            )
+        else:
+            global_text = "  Sin datos históricos suficientes."
+
+        return f"""Eres un asistente médico especializado en diabetes tipo II.
+Estás hablando directamente con el paciente. Usa sus datos reales para responder.
 
 REGLAS:
-- SOLO usa los datos proporcionados.
-- NO inventes información médica.
-- Si faltan datos, dilo claramente.
-- Responde de forma breve, clara y útil.
-- Responde siempre en español.
+- Usa SOLO los datos proporcionados, nunca inventes valores.
+- Si no hay datos suficientes para responder, dilo claramente.
+- Sé breve, cálido y útil. Responde siempre en español.
+- Si el usuario saluda o hace preguntas generales, responde normalmente usando su nombre.
+- Si pregunta sobre sus niveles, usa los datos reales de abajo.
 
-HISTORIAL RECIENTE:
-{history_text or "Sin historial previo."}
+PERFIL DEL PACIENTE:
+  Nombre: {perfil.get('nombre', 'Usuario')}
+  Años con diagnóstico: {perfil.get('anios_diagnostico', 'N/A')}
+  Usa insulina: {'Sí' if perfil.get('usa_insulina') else 'No'}
+  Nivel de actividad: {perfil.get('nivel_actividad', 'N/A')}
+  HbA1c inicial: {perfil.get('hba1c_inicial', 'N/A')}
 
-DATOS DEL PACIENTE:
-{context}
+GLUCOSA DE HOY:
+{glucosa_hoy_text}
 
-PREGUNTA:
+RESUMEN ÚLTIMOS 7 DÍAS:
+{semana_text}
+
+GLUCOSA GLOBAL:
+{global_text}
+
+OBJETIVOS DE GLUCOSA:
+{obj_text}
+
+HISTORIAL DE CONVERSACIÓN:
+{history_text}
+
+PREGUNTA DEL PACIENTE:
 {question}
 """
 

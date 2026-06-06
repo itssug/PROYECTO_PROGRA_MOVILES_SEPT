@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'auth_service.dart';
+import '../../../config/api_config.dart';
 
 class AIService {
+  static const String _base = '${ApiConfig.baseUrl}/api';
   // ── Configuración base ────────────────────────────────────────────────────
   // Cambia según entorno:
   //   Android emulator → 10.0.2.2
@@ -20,13 +23,74 @@ class AIService {
     // TODO: descomentar cuando tengas auth
     // if (_authToken != null) 'Authorization': 'Bearer $_authToken',
   };
+    // ============================================================
+  // OBTENER HEADERS CON TOKEN DE FORMA SEGURA
+  // ============================================================
+  static Future<Map<String, String>> _getAuthHeaders() async {
+    final token = await AuthService.getTokenSeguro();
+    print('🔑 Token usado para headers: $token');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Token $token',
+    };
+  }
+
+  static Future<void> debugToken() async {
+    try {
+      final token = await AuthService.getTokenSeguro();
+      print('🐛 DEBUG - Token: $token');
+
+      final response = await http.get(
+        Uri.parse('$_base/auth/debug-token/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Token $token',
+        },
+      );
+
+      print('🐛 DEBUG - Status: ${response.statusCode}');
+      print('🐛 DEBUG - Response: ${response.body}');
+    } catch (e) {
+      print('🐛 DEBUG - Error: $e');
+    }
+  }
+
+  // ============================================================
+  // OBTENER PERFIL COMPLETO
+  // ============================================================
+  static Future<Map<String, dynamic>> getPerfil() async {
+    try {
+      final headers = await _getAuthHeaders();
+
+      final response = await http
+          .get(
+            Uri.parse('$_base/auth/perfil/'),
+            headers: headers,
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      throw Exception(
+        'Error al obtener perfil (${response.statusCode})',
+      );
+
+    } catch (e) {
+      print('❌ Error en getPerfil: $e');
+      rethrow;
+    }
+  }
+ 
 
   // ── Chat principal ────────────────────────────────────────────────────────
-  static Future<AIResponse> enviarMensaje(
-    String mensaje, {
-    int? userId, // temporal hasta implementar auth
-  }) async {
+  static Future<AIResponse> enviarMensaje(String mensaje) async {
+    final perfil = await getPerfil();
+
+    final userId = perfil['id'];
     final url = Uri.parse('http://127.0.0.1:8000/api/ai/chat/');
+    /* Ayudame a printear el id */
+    print("id del usu");
 
     try {
       final response = await http

@@ -84,7 +84,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'gluoca_app2',
+        'NAME': 'glucosa_app3',
         'USER': 'root',
         'PASSWORD': '',
         'HOST': 'localhost',
