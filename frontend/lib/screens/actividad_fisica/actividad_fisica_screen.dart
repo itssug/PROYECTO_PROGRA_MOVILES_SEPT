@@ -195,6 +195,7 @@ class _ActividadFisicaScreenState extends State<ActividadFisicaScreen>
                   ],
                 ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
         backgroundColor: kNaranja,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add),

@@ -5,17 +5,12 @@ import '../screens/ai_prediction_screen.dart';
 import 'ai_model_badge.dart';
 import 'ai_gauge_card.dart';
 import 'ai_recommendation_list.dart';
+import '../../../services/actividad_fisica_service.dart';
+import '../../estado_sueno/services/estado_sueno_service.dart';
 
 /// Plugin del dashboard de IA.
-///
-/// Muestra el último resultado de predicción si existe,
-/// o un prompt para que el usuario ingrese su próxima comida.
 class AiDashboardPlugin extends StatefulWidget {
   final int userId;
-
-  /// Datos de contexto del usuario (glucosa basal, sueño, estrés, ejercicio).
-  /// Vienen del perfil / últimos registros. NO incluye carbohidratos —
-  /// eso lo ingresa el usuario antes de cada comida.
   final Map<String, dynamic> contextData;
 
   const AiDashboardPlugin({
@@ -31,6 +26,33 @@ class AiDashboardPlugin extends StatefulWidget {
 class _AiDashboardPluginState extends State<AiDashboardPlugin> {
   AIPredictionResult? _lastResult;
   List<String> _lastRecommendations = [];
+  Map<String, dynamic> _realContextData = {};
+  bool _loadingContext = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _realContextData = Map.from(widget.contextData);
+    _loadRealContextData();
+  }
+
+  Future<void> _loadRealContextData() async {
+    try {
+      final act = await ActividadFisicaService.obtenerResumenHoy();
+      _realContextData['ejercicio'] = (act['total_minutos'] ?? 30.0).toDouble();
+      
+      final suenos = await EstadoSuenoService.getSuenos(widget.userId);
+      if (suenos.isNotEmpty) {
+        _realContextData['horas_sueno'] = suenos.last.horasDormidas ?? 7.0;
+        final calidadMap = {'Excelente': 1, 'Buena': 2, 'Regular': 3, 'Mala': 4, 'Pésima': 5};
+        _realContextData['estres'] = calidadMap[suenos.last.calidad] ?? 3;
+      }
+    } catch (e) {
+      // Usar defaults
+    } finally {
+      if (mounted) setState(() => _loadingContext = false);
+    }
+  }
 
   /// Abre la pantalla de predicción y captura el resultado al volver
   Future<void> _openPredictionScreen() async {
@@ -39,12 +61,11 @@ class _AiDashboardPluginState extends State<AiDashboardPlugin> {
       MaterialPageRoute(
         builder: (_) => AiPredictionScreen(
           userId: widget.userId,
-          contextData: widget.contextData,
+          contextData: _realContextData,
         ),
       ),
     );
 
-    // Si el usuario predijo algo, actualizamos el dashboard
     if (result != null && mounted) {
       setState(() {
         _lastResult = result.prediction;
@@ -55,6 +76,8 @@ class _AiDashboardPluginState extends State<AiDashboardPlugin> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingContext) return const SizedBox(height: 50, child: Center(child: CircularProgressIndicator()));
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

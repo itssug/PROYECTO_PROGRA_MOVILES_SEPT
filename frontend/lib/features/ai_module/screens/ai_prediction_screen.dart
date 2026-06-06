@@ -7,6 +7,8 @@ import '../utils/recommendation_engine.dart';
 import '../widgets/ai_model_badge.dart';
 import '../widgets/ai_gauge_card.dart';
 import '../widgets/ai_recommendation_list.dart';
+import '../../../services/actividad_fisica_service.dart';
+import '../../estado_sueno/services/estado_sueno_service.dart';
 
 /// Pantalla del Motor de Predicción IA — flujo pre-comida.
 ///
@@ -64,9 +66,9 @@ class _AiPredictionScreenState extends State<AiPredictionScreen>
     _alimentacionService = AlimentacionService(token: token);
 
     _glucosaAntes = _toDouble(widget.contextData['glucosa_antes']) ?? 120.0;
-    _horasSueno   = _toDouble(widget.contextData['horas_sueno'])   ?? 7.0;
-    _estres       = _toInt(widget.contextData['estres'])           ?? 3;
-    _ejercicio    = _toDouble(widget.contextData['ejercicio'])      ?? 0.0;
+    _horasSueno   = 0.0;
+    _estres       = 3;
+    _ejercicio    = 0.0;
 
     _resultController = AnimationController(
       vsync: this,
@@ -76,6 +78,53 @@ class _AiPredictionScreenState extends State<AiPredictionScreen>
       parent: _resultController,
       curve: Curves.easeOut,
     );
+
+    _loadRealContextData();
+  }
+
+  Future<void> _loadRealContextData() async {
+    // 1. Cargar Actividad Física
+    try {
+      final act = await ActividadFisicaService.obtenerResumenHoy();
+      if (mounted) {
+        setState(() {
+          _ejercicio = (act['total_minutos'] ?? 30.0).toDouble(); // Ejercicio por defecto si es nulo
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _ejercicio = 30.0);
+    }
+
+    // 2. Cargar Sueño
+    try {
+      final suenos = await EstadoSuenoService.getSuenos(widget.userId);
+      if (mounted && suenos.isNotEmpty) {
+        setState(() {
+          _horasSueno = suenos.first.horasDormidas ?? 7.0;
+        });
+      }
+    } catch (e) {
+      // Ignorar fallo de sueño
+    }
+
+    // 3. Cargar Estado Emocional (Estrés)
+    try {
+      final estados = await EstadoSuenoService.getEstados(widget.userId);
+      if (mounted && estados.isNotEmpty) {
+        setState(() {
+          // Normalizar el nivel de estrés a una escala de 1 a 5 si el modelo lo requiere,
+          // o si el nivel ya es 1-5, tomarlo directo.
+          int estresDB = estados.first.nivelEstres;
+          // Si en la DB está guardado de 1 a 10, lo escalamos a 1-5 (opcional). 
+          // Supondremos que la DB usa la misma escala requerida por ML.
+          if (estresDB > 5) estresDB = (estresDB / 2).ceil(); 
+          if (estresDB < 1) estresDB = 1;
+          _estres = estresDB;
+        });
+      }
+    } catch (e) {
+      // Ignorar fallo de estado emocional
+    }
   }
 
   @override

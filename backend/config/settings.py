@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'estado_sueno',
     'analitica_ia',
     'ml_engine',
+    'alimentacion',
 ]
 
 MIDDLEWARE = [
