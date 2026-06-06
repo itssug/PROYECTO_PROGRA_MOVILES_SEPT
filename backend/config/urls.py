@@ -8,4 +8,7 @@ urlpatterns = [
 
     #modulo gi
     path('api/estado-sueno/', include('estado_sueno.urls')),
+    #chat
+    path('api/ai/', include('app.urls')),  # <- esto faltaría
+
 ]

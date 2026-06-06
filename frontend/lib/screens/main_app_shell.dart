@@ -10,6 +10,7 @@ import 'actividad_fisica/actividad_fisica_screen.dart';
 import '../features/estado_sueno/screens/estado_sueno_screen.dart';
 import 'usuarios/salud.dart';
 import 'usuarios/perfil.dart';
+import 'chat_screen.dart';
 
 class MainAppShell extends StatefulWidget {
   const MainAppShell({super.key});
@@ -78,6 +79,7 @@ class _MainAppShellState extends State<MainAppShell> {
                 const MedicamentosMainScreen(),
                 const AlimentacionMainScreen(),
                 const ActividadFisicaScreen(),
+                const ChatScreen(),
               ],
             ),
       bottomNavigationBar: BottomNavigationBar(
@@ -207,6 +209,33 @@ class _MainAppShellState extends State<MainAppShell> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => PerfilScreen(onPerfilActualizado: _recargarPerfil),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.smart_toy_outlined,
+                    color: Colors.orange,
+                  ),
+                  title: const Text(
+                    'Asistente IA',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.auto_awesome,
+                    color: Colors.orange,
+                    size: 18,
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatScreen(),
                       ),
                     );
                   },
