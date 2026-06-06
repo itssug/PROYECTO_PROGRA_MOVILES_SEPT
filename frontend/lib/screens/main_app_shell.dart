@@ -8,6 +8,7 @@ import 'medicamentos_main_screen.dart';
 import 'alimentacion/alimentacion_main_screen.dart';
 import 'actividad_fisica/actividad_fisica_screen.dart';
 import '../features/estado_sueno/screens/estado_sueno_screen.dart';
+import '../features/ai_module/screens/ai_prediction_screen.dart';
 import 'usuarios/salud.dart';
 import 'usuarios/perfil.dart';
 import 'chat_screen.dart';
@@ -49,6 +50,26 @@ class _MainAppShellState extends State<MainAppShell> {
 
   void _recargarPerfil() {
     _cargarPerfil();
+  }
+
+  void _openAiScreen(BuildContext context) {
+    final userId = AuthService.usuario?['id'] ?? 14;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AiPredictionScreen(
+          userId: userId,
+          contextData: {
+            // Datos conocidos del usuario
+            // En producción vendrán del último registro
+            'glucosa_antes': _perfil?['glucosa_actual'] ?? 126.0,
+            'horas_sueno': 7.0,
+            'estres': 2,
+            'ejercicio': 30.0,
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -179,6 +200,16 @@ class _MainAppShellState extends State<MainAppShell> {
                   },
                 ),
                 const Divider(color: AppColors.border),
+                // ── Motor de IA
+                _buildDrawerItemHighlighted(
+                  icon: Icons.hub_rounded,
+                  text: 'Motor de Predicción IA',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openAiScreen(context);
+                  },
+                ),
+                const Divider(color: AppColors.border),
                 _buildDrawerItem(
                   icon: Icons.mood,
                   text: 'Estado Emocional y Sueño',
@@ -286,6 +317,49 @@ class _MainAppShellState extends State<MainAppShell> {
     return ListTile(
       leading: Icon(icon, color: AppColors.textMuted),
       title: Text(text, style: const TextStyle(color: AppColors.textPrim)),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildDrawerItemHighlighted({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF8B2500), Color(0xFFE55A00)],
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: Colors.white, size: 18),
+      ),
+      title: Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.textPrim,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.orange.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Text(
+          'IA',
+          style: TextStyle(
+            color: AppColors.orange,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
       onTap: onTap,
     );
   }

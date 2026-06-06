@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 // ─── Modelos de Respuesta de la API ──────────────────────────────────────────
 
@@ -33,6 +36,24 @@ class ComidaApi {
     required this.porcionTipica,
     required this.esPersonalizado,
   });
+
+  factory ComidaApi.fromJson(Map<String, dynamic> json) {
+    return ComidaApi(
+      id: json['id'],
+      nombre: json['nombre'],
+      categoria: json['categoria'],
+      calorias: json['calorias'] != null ? double.parse(json['calorias'].toString()) : null,
+      carbohidratos: json['carbohidratos'] != null ? double.parse(json['carbohidratos'].toString()) : null,
+      azucares: json['azucares'] != null ? double.parse(json['azucares'].toString()) : null,
+      proteinas: json['proteinas'] != null ? double.parse(json['proteinas'].toString()) : null,
+      grasas: json['grasas'] != null ? double.parse(json['grasas'].toString()) : null,
+      indiceGlucemico: json['indiceGlucemico'],
+      cargaGlucemica: json['cargaGlucemica'] != null ? double.parse(json['cargaGlucemica'].toString()) : null,
+      unidadMedida: json['unidadMedida'] ?? 'gramos',
+      porcionTipica: json['porcionTipica'] != null ? double.parse(json['porcionTipica'].toString()) : 100.0,
+      esPersonalizado: json['esPersonalizado'] ?? false,
+    );
+  }
 }
 
 class RegistroComidaApi {
@@ -69,6 +90,26 @@ class RegistroComidaApi {
     this.cargaGlucemica,
     this.notas,
   });
+
+  factory RegistroComidaApi.fromJson(Map<String, dynamic> json) {
+    return RegistroComidaApi(
+      id: json['id'],
+      comidaId: json['comidaId'],
+      comidaNombre: json['comidaNombre'] ?? '',
+      comidaCategoria: json['comidaCategoria'] ?? '',
+      cantidad: double.parse(json['cantidad'].toString()),
+      unidad: json['unidad'] ?? 'gramos',
+      tipoComida: json['tipoComida'] ?? '',
+      tipoComidaDisplay: json['tipoComidaDisplay'] ?? '',
+      fecha: json['fecha'],
+      hora: json['hora'],
+      caloriasCalculadas: json['caloriasCalculadas'] != null ? double.parse(json['caloriasCalculadas'].toString()) : null,
+      carbohidratosCalculados: json['carbohidratosCalculados'] != null ? double.parse(json['carbohidratosCalculados'].toString()) : null,
+      azucaresCalculados: json['azucaresCalculados'] != null ? double.parse(json['azucaresCalculados'].toString()) : null,
+      cargaGlucemica: json['cargaGlucemica'] != null ? double.parse(json['cargaGlucemica'].toString()) : null,
+      notas: json['notas'],
+    );
+  }
 }
 
 class ResumenDiario {
@@ -89,6 +130,25 @@ class ResumenDiario {
     required this.cantidadRegistros,
     required this.porTipoComida,
   });
+
+  factory ResumenDiario.fromJson(Map<String, dynamic> json) {
+    Map<String, double> tipoComidaMap = {};
+    if (json['porTipoComida'] != null) {
+      json['porTipoComida'].forEach((k, v) {
+        tipoComidaMap[k] = double.parse(v.toString());
+      });
+    }
+
+    return ResumenDiario(
+      fecha: json['fecha'] ?? '',
+      totalCalorias: json['totalCalorias'] != null ? double.parse(json['totalCalorias'].toString()) : 0.0,
+      totalCarbohidratos: json['totalCarbohidratos'] != null ? double.parse(json['totalCarbohidratos'].toString()) : 0.0,
+      totalAzucares: json['totalAzucares'] != null ? double.parse(json['totalAzucares'].toString()) : 0.0,
+      totalCargaGlucemica: json['totalCargaGlucemica'] != null ? double.parse(json['totalCargaGlucemica'].toString()) : 0.0,
+      cantidadRegistros: json['cantidadRegistros'] ?? 0,
+      porTipoComida: tipoComidaMap,
+    );
+  }
 }
 
 // ─── Excepción Personalizada ─────────────────────────────────────────────────
@@ -100,71 +160,52 @@ class AlimentacionException implements Exception {
   String toString() => message;
 }
 
-// ─── Servicio Principal (Datos Simulados / Mock) ─────────────────────────────
+// ─── Servicio Principal (Conexión Real Backend) ──────────────────────────────
 
 class AlimentacionService {
   final String _token;
 
-  AlimentacionService({required String token}) : _token = token {
-    _initMockData();
-  }
+  AlimentacionService({required String token}) : _token = token;
 
-  // ── Base de Datos Local Simulada en Memoria ───────────────────────────────
-  static int _nextRegistroId = 1000;
-  static bool _initialized = false;
-
-  // Catálogo adaptado al contexto (Pacientes con Diabetes y dieta local)
-  static final List<ComidaApi> _catalogo = [
-    ComidaApi(id: 1, nombre: 'Avena cocida', categoria: 'Cereales', calorias: 71, carbohidratos: 12, azucares: 0.5, proteinas: 2.5, grasas: 1.4, indiceGlucemico: 55, cargaGlucemica: 6.6, unidadMedida: 'gramos', porcionTipica: 100, esPersonalizado: false),
-    ComidaApi(id: 2, nombre: 'Pechuga de pollo a la plancha', categoria: 'Carnes', calorias: 165, carbohidratos: 0, azucares: 0, proteinas: 31, grasas: 3.6, indiceGlucemico: 0, cargaGlucemica: 0, unidadMedida: 'gramos', porcionTipica: 100, esPersonalizado: false),
-    ComidaApi(id: 3, nombre: 'Quinua cocida', categoria: 'Cereales', calorias: 120, carbohidratos: 21.3, azucares: 0.9, proteinas: 4.4, grasas: 1.9, indiceGlucemico: 53, cargaGlucemica: 11, unidadMedida: 'gramos', porcionTipica: 100, esPersonalizado: false),
-    ComidaApi(id: 4, nombre: 'Sopa de Maní', categoria: 'Sopas', calorias: 280, carbohidratos: 30, azucares: 2, proteinas: 10, grasas: 14, indiceGlucemico: 65, cargaGlucemica: 18, unidadMedida: 'plato', porcionTipica: 1, esPersonalizado: false),
-    ComidaApi(id: 5, nombre: 'Salteña de pollo', categoria: 'Comida Rápida', calorias: 350, carbohidratos: 45, azucares: 15, proteinas: 12, grasas: 18, indiceGlucemico: 75, cargaGlucemica: 30, unidadMedida: 'unidad', porcionTipica: 1, esPersonalizado: false),
-    ComidaApi(id: 6, nombre: 'Manzana verde', categoria: 'Frutas', calorias: 52, carbohidratos: 13.8, azucares: 10.4, proteinas: 0.3, grasas: 0.2, indiceGlucemico: 39, cargaGlucemica: 5, unidadMedida: 'gramos', porcionTipica: 100, esPersonalizado: false),
-    ComidaApi(id: 7, nombre: 'Mate de Coca (sin azúcar)', categoria: 'Bebidas', calorias: 2, carbohidratos: 0.5, azucares: 0, proteinas: 0, grasas: 0, indiceGlucemico: 0, cargaGlucemica: 0, unidadMedida: 'taza', porcionTipica: 1, esPersonalizado: false),
-    ComidaApi(id: 8, nombre: 'Huevo duro', categoria: 'Proteínas', calorias: 155, carbohidratos: 1.1, azucares: 1.1, proteinas: 13, grasas: 11, indiceGlucemico: 0, cargaGlucemica: 0, unidadMedida: 'unidad', porcionTipica: 1, esPersonalizado: false),
-  ];
-
-  static final List<RegistroComidaApi> _registros = [];
-
-  void _initMockData() {
-    if (_initialized) return;
-    
-    // Generar datos para "Hoy" automáticamente
-    final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    
-    _registros.addAll([
-      RegistroComidaApi(
-        id: _nextRegistroId++, comidaId: 1, comidaNombre: 'Avena cocida', comidaCategoria: 'Cereales', cantidad: 150, unidad: 'gramos', tipoComida: 'desayuno', tipoComidaDisplay: 'Desayuno', fecha: hoy, hora: '07:30:00', caloriasCalculadas: 106.5, carbohidratosCalculados: 18, azucaresCalculados: 0.75, cargaGlucemica: 9.9
-      ),
-      RegistroComidaApi(
-        id: _nextRegistroId++, comidaId: 7, comidaNombre: 'Mate de Coca (sin azúcar)', comidaCategoria: 'Bebidas', cantidad: 1, unidad: 'taza', tipoComida: 'desayuno', tipoComidaDisplay: 'Desayuno', fecha: hoy, hora: '07:45:00', caloriasCalculadas: 2, carbohidratosCalculados: 0.5, azucaresCalculados: 0, cargaGlucemica: 0
-      ),
-      RegistroComidaApi(
-        id: _nextRegistroId++, comidaId: 2, comidaNombre: 'Pechuga de pollo a la plancha', comidaCategoria: 'Carnes', cantidad: 200, unidad: 'gramos', tipoComida: 'almuerzo', tipoComidaDisplay: 'Almuerzo', fecha: hoy, hora: '13:00:00', caloriasCalculadas: 330, carbohidratosCalculados: 0, azucaresCalculados: 0, cargaGlucemica: 0
-      ),
-      RegistroComidaApi(
-        id: _nextRegistroId++, comidaId: 3, comidaNombre: 'Quinua cocida', comidaCategoria: 'Cereales', cantidad: 100, unidad: 'gramos', tipoComida: 'almuerzo', tipoComidaDisplay: 'Almuerzo', fecha: hoy, hora: '13:05:00', caloriasCalculadas: 120, carbohidratosCalculados: 21.3, azucaresCalculados: 0.9, cargaGlucemica: 11
-      ),
-    ]);
-    
-    _initialized = true;
-  }
+  Map<String, String> get _headers => {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_token',
+      };
 
   // ── Operaciones de Comidas (Catálogo) ───────────────────────────────────────
 
   Future<List<ComidaApi>> getCatalogo({String? categoria}) async {
-    await Future.delayed(const Duration(milliseconds: 400)); // Simula latencia de red
-    if (categoria != null) {
-      return _catalogo.where((c) => c.categoria.toLowerCase() == categoria.toLowerCase()).toList();
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/catalogo/').replace(
+          queryParameters: categoria != null ? {'categoria': categoria} : null);
+          
+      final response = await http.get(uri, headers: _headers);
+      if (response.statusCode == 200) {
+        List jsonResponse = json.decode(response.body);
+        return jsonResponse.map((c) => ComidaApi.fromJson(c)).toList();
+      } else {
+        throw const AlimentacionException('Error al cargar el catálogo de comidas.');
+      }
+    } catch (e) {
+      throw AlimentacionException('Fallo de conexión: $e');
     }
-    return _catalogo;
   }
 
   Future<List<ComidaApi>> buscarAlimentos(String query) async {
-    await Future.delayed(const Duration(milliseconds: 500)); 
-    final q = query.toLowerCase();
-    return _catalogo.where((c) => c.nombre.toLowerCase().contains(q)).toList();
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/buscar/').replace(
+          queryParameters: {'q': query});
+          
+      final response = await http.get(uri, headers: _headers);
+      if (response.statusCode == 200) {
+        List jsonResponse = json.decode(response.body);
+        return jsonResponse.map((c) => ComidaApi.fromJson(c)).toList();
+      } else {
+        throw const AlimentacionException('Error al buscar alimentos.');
+      }
+    } catch (e) {
+      throw AlimentacionException('Fallo de conexión: $e');
+    }
   }
 
   Future<ComidaApi> crearAlimentoPersonalizado({
@@ -180,32 +221,53 @@ class AlimentacionService {
     double porcionTipica = 100,
     String? descripcion,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    final nuevaComida = ComidaApi(
-      id: _catalogo.length + 1,
-      nombre: nombre,
-      categoria: categoria,
-      calorias: calorias,
-      carbohidratos: carbohidratos,
-      azucares: azucares,
-      proteinas: proteinas,
-      grasas: grasas,
-      indiceGlucemico: indiceGlucemico,
-      cargaGlucemica: 0, 
-      unidadMedida: unidadMedida,
-      porcionTipica: porcionTipica,
-      esPersonalizado: true,
-    );
-    _catalogo.add(nuevaComida);
-    return nuevaComida;
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/catalogo/'),
+        headers: _headers,
+        body: json.encode({
+          'nombre': nombre,
+          'categoria': categoria,
+          'calorias': calorias,
+          'carbohidratos': carbohidratos,
+          'azucares': azucares,
+          'proteinas': proteinas,
+          'grasas': grasas,
+          'indiceGlucemico': indiceGlucemico,
+          'unidadMedida': unidadMedida,
+          'porcionTipica': porcionTipica,
+          'descripcion': descripcion,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        return ComidaApi.fromJson(json.decode(response.body));
+      } else {
+        throw const AlimentacionException('Error al crear el alimento personalizado.');
+      }
+    } catch (e) {
+      throw AlimentacionException('Fallo de conexión: $e');
+    }
   }
 
   // ── Registro de Comidas consumidas ──────────────────────────────────────────
 
   Future<List<RegistroComidaApi>> getRegistrosDia({String? fecha}) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final targetDate = fecha ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
-    return _registros.where((r) => r.fecha == targetDate).toList();
+    try {
+      final targetDate = fecha ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final uri = Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/registros/').replace(
+          queryParameters: {'fecha': targetDate});
+          
+      final response = await http.get(uri, headers: _headers);
+      if (response.statusCode == 200) {
+        List jsonResponse = json.decode(response.body);
+        return jsonResponse.map((r) => RegistroComidaApi.fromJson(r)).toList();
+      } else {
+        throw const AlimentacionException('Error al cargar registros del día.');
+      }
+    } catch (e) {
+      throw AlimentacionException('Fallo de conexión: $e');
+    }
   }
 
   Future<RegistroComidaApi> registrarComida({
@@ -217,74 +279,66 @@ class AlimentacionService {
     String unidad = 'gramos',
     String? notas,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    
-    final comida = _catalogo.firstWhere((c) => c.id == comidaId, 
-      orElse: () => throw const AlimentacionException('Comida no encontrada en el catálogo local.'));
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/registros/'),
+        headers: _headers,
+        body: json.encode({
+          'comidaId': comidaId,
+          'cantidad': cantidad,
+          'tipoComida': tipoComida,
+          'fecha': fecha,
+          'hora': hora,
+          'unidad': unidad,
+          'notas': notas,
+        }),
+      );
 
-    // Calcular macronutrientes proporcionales a la cantidad ingresada
-    double factor = cantidad / comida.porcionTipica;
-
-    final nuevoRegistro = RegistroComidaApi(
-      id: _nextRegistroId++,
-      comidaId: comida.id,
-      comidaNombre: comida.nombre,
-      comidaCategoria: comida.categoria,
-      cantidad: cantidad,
-      unidad: unidad,
-      tipoComida: tipoComida,
-      tipoComidaDisplay: tipoComida.toUpperCase(),
-      fecha: fecha,
-      hora: hora,
-      caloriasCalculadas: (comida.calorias ?? 0) * factor,
-      carbohidratosCalculados: (comida.carbohidratos ?? 0) * factor,
-      azucaresCalculados: (comida.azucares ?? 0) * factor,
-      cargaGlucemica: (comida.cargaGlucemica ?? 0) * factor,
-      notas: notas,
-    );
-
-    _registros.add(nuevoRegistro);
-    return nuevoRegistro;
+      if (response.statusCode == 201) {
+        return RegistroComidaApi.fromJson(json.decode(response.body));
+      } else {
+        throw const AlimentacionException('Error al registrar la comida.');
+      }
+    } catch (e) {
+      throw AlimentacionException('Fallo de conexión: $e');
+    }
   }
 
   Future<void> eliminarRegistro(int registroId) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    _registros.removeWhere((r) => r.id == registroId);
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/registros/$registroId/'),
+        headers: _headers,
+      );
+
+      if (response.statusCode != 204) {
+        throw const AlimentacionException('Error al eliminar el registro.');
+      }
+    } catch (e) {
+      throw AlimentacionException('Fallo de conexión: $e');
+    }
   }
 
   // ── Resúmenes Diarios e Historial ───────────────────────────────────────────
 
   Future<ResumenDiario> getResumenDia({String? fecha}) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final targetDate = fecha ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
-    
-    final registrosDia = _registros.where((r) => r.fecha == targetDate).toList();
-    
-    double cal = 0, carb = 0, azu = 0, gl = 0;
-    Map<String, double> porTipo = {};
-
-    for (var r in registrosDia) {
-      cal += r.caloriasCalculadas ?? 0;
-      carb += r.carbohidratosCalculados ?? 0;
-      azu += r.azucaresCalculados ?? 0;
-      gl += r.cargaGlucemica ?? 0;
-      
-      porTipo[r.tipoComida] = (porTipo[r.tipoComida] ?? 0) + (r.caloriasCalculadas ?? 0);
+    try {
+      final targetDate = fecha ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final uri = Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/resumen/').replace(
+          queryParameters: {'fecha': targetDate});
+          
+      final response = await http.get(uri, headers: _headers);
+      if (response.statusCode == 200) {
+        return ResumenDiario.fromJson(json.decode(response.body));
+      } else {
+        throw const AlimentacionException('Error al cargar el resumen diario.');
+      }
+    } catch (e) {
+      throw AlimentacionException('Fallo de conexión: $e');
     }
-
-    return ResumenDiario(
-      fecha: targetDate,
-      totalCalorias: cal,
-      totalCarbohidratos: carb,
-      totalAzucares: azu,
-      totalCargaGlucemica: gl,
-      cantidadRegistros: registrosDia.length,
-      porTipoComida: porTipo,
-    );
   }
 
   Future<List<Map<String, dynamic>>> getHistorial({int dias = 7}) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    return []; // Se devuelve vacío ya que no se utiliza activamente en la UI proporcionada
+    return []; // Aún no implementado en backend.
   }
 }

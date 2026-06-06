@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:frontend/models/diet_model.dart';
+import 'package:frontend/services/alimentacion_service.dart';
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
@@ -12,6 +12,8 @@ const _yellow = Color(0xFFFDE68A);
 const _redOrange = Color(0xFFFCA5A5);
 const _textSub = Color(0xFF9CA3AF);
 
+const _demoToken = 'd43af4dada88bc80639484957f30d603079b5b55395d556d210a5837779a49d5';
+
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -20,16 +22,50 @@ class AnalysisScreen extends StatefulWidget {
 }
 
 class _AnalysisScreenState extends State<AnalysisScreen> {
+  late final AlimentacionService _service;
+  ResumenDiario? _resumen;
+  List<RegistroComidaApi> _registros = [];
+  bool _loading = true;
+
   int _selectedPeriod = 0; // 0=Diario, 1=Semanal, 2=Mensual
   final List<String> _periods = ['Diario', 'Semanal', 'Mensual'];
 
-  // Totales calculados a partir de registros simulados (mock entries)
-  double get _totalCalories =>
-      mockTodayEntries.fold(0, (s, e) => s + e.calories);
-  double get _totalCarbs => mockTodayEntries.fold(0, (s, e) => s + e.carbs);
-  double get _totalProteins =>
-      mockTodayEntries.fold(0, (s, e) => s + e.proteins);
-  double get _totalFats => mockTodayEntries.fold(0, (s, e) => s + e.fats);
+  @override
+  void initState() {
+    super.initState();
+    _service = AlimentacionService(token: _demoToken);
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    try {
+      final results = await Future.wait([
+        _service.getResumenDia(),
+        _service.getRegistrosDia(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _resumen = results[0] as ResumenDiario;
+          _registros = results[1] as List<RegistroComidaApi>;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  // Totales de la BD
+  double get _totalCalories => _resumen?.totalCalorias ?? 0;
+  double get _totalCarbs => _resumen?.totalCarbohidratos ?? 0;
+  // Aproximación ya que el backend no guarda macro proteínas/grasas en el resumen
+  double get _totalProteins => (_totalCalories * 0.25) / 4;
+  double get _totalFats => (_totalCalories * 0.25) / 9;
+
+
 
   // Porcentajes de Macronutrientes
   double get _totalMacroG => _totalCarbs + _totalProteins + _totalFats;
@@ -42,6 +78,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: _bg,
+        body: Center(child: CircularProgressIndicator(color: _orange)),
+      );
+    }
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
@@ -202,8 +244,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           SizedBox(
             height: 140,
             child: _CalorieLineChart(
-              goalData: goalCalories,
-              actualData: actualCalories,
+              goalData: const [1800, 1800, 1800, 1800, 1800, 1800, 1800],
+              actualData: [1600, 1900, 1750, 1850, 2100, 1700, _totalCalories],
             ),
           ),
           const SizedBox(height: 12),
@@ -416,7 +458,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  // ── Registro de Comidas de Hoy ──────────────────────────────────────────────
   Widget _buildTodayLogSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,17 +473,20 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            Text('${mockTodayEntries.length} elementos',
+            Text('${_registros.length} elementos',
                 style: const TextStyle(color: _textSub, fontSize: 13)),
           ],
         ),
         const SizedBox(height: 12),
-        ...mockTodayEntries.map((e) => _buildFoodLogItem(e)),
+        if (_registros.isEmpty)
+          const Text('No hay comidas registradas hoy.', style: TextStyle(color: _textSub))
+        else
+          ..._registros.map((e) => _buildFoodLogItem(e)),
       ],
     );
   }
 
-  Widget _buildFoodLogItem(FoodEntry entry) {
+  Widget _buildFoodLogItem(RegistroComidaApi entry) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -468,7 +512,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  entry.foodName,
+                  entry.comidaNombre,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -476,7 +520,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   ),
                 ),
                 Text(
-                  '${entry.mealType} · ${entry.time}',
+                  '${entry.tipoComidaDisplay} · ${entry.hora}',
                   style:
                       const TextStyle(color: _textSub, fontSize: 12),
                 ),
@@ -487,7 +531,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${entry.calories.toStringAsFixed(0)} kcal',
+                '${(entry.caloriasCalculadas ?? 0).toStringAsFixed(0)} kcal',
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
@@ -495,7 +539,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 ),
               ),
               Text(
-                'C: ${entry.carbs.toStringAsFixed(1)}g',
+                'C: ${(entry.carbohidratosCalculados ?? 0).toStringAsFixed(1)}g',
                 style: const TextStyle(color: _textSub, fontSize: 11),
               ),
             ],

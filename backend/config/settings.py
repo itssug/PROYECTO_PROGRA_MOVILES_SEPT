@@ -41,6 +41,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'core',
     'estado_sueno',
+    'analitica_ia',
+    'ml_engine',
+    'alimentacion',
     'app',
 ]
 
