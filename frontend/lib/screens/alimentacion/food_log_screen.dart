@@ -1,9 +1,12 @@
+// ============================================================
+// ARCHIVO: lib/screens/alimentacion/food_log_screen.dart
+// CONECTADO AL BACKEND REAL
+// ============================================================
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../services/alimentacion_service.dart';
 
-import 'package:frontend/services/alimentacion_service.dart';
-
-// ─── Colores ──────────────────────────────────────────────────────────────────
+// ─── Colores ──────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
 const _card = Color(0xFF1A1A1A);
 const _orange = Color(0xFFFF5500);
@@ -12,10 +15,7 @@ const _yellow = Color(0xFFFDE68A);
 const _redOrange = Color(0xFFFCA5A5);
 const _textSub = Color(0xFF9CA3AF);
 
-// Token de prueba — en producción obtener del sistema de auth (SharedPreferences / Provider)
-const _demoToken = 'd43af4dada88bc80639484957f30d603079b5b55395d556d210a5837779a49d5';
-
-// ─── Etiquetas para Tipo de Comida ────────────────────────────────────────────
+// ─── Etiquetas para Tipo de Comida ────────────────────────────
 const _tipoComidaOptions = [
   ('desayuno', 'Desayuno'),
   ('media_manana', 'Media Mañana'),
@@ -44,8 +44,6 @@ class FoodLogScreen extends StatefulWidget {
 }
 
 class _FoodLogScreenState extends State<FoodLogScreen> {
-  late final AlimentacionService _service;
-
   List<RegistroComidaApi> _registros = [];
   ResumenDiario? _resumen;
   bool _loading = true;
@@ -55,7 +53,6 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
   @override
   void initState() {
     super.initState();
-    _service = AlimentacionService(token: _demoToken);
     _loadData();
   }
 
@@ -68,8 +65,8 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     });
     try {
       final results = await Future.wait([
-        _service.getRegistrosDia(fecha: _fechaStr),
-        _service.getResumenDia(fecha: _fechaStr),
+        AlimentacionService.getRegistrosDia(fecha: _fechaStr),
+        AlimentacionService.getResumenDia(fecha: _fechaStr),
       ]);
       setState(() {
         _registros = results[0] as List<RegistroComidaApi>;
@@ -91,7 +88,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
 
   Future<void> _eliminarRegistro(RegistroComidaApi r) async {
     try {
-      await _service.eliminarRegistro(r.id);
+      await AlimentacionService.eliminarRegistro(r.id);
       _loadData();
     } on AlimentacionException catch (e) {
       _showSnack(e.message, isError: true);
@@ -109,7 +106,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Navegación entre Fechas ─────────────────────────────────────────────────
+  // ── Navegación entre Fechas ─────────────────────────────────
   void _prevDay() {
     setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1)));
     _loadData();
@@ -156,7 +153,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Cabecera (Header) ───────────────────────────────────────────────────────
+  // ── Cabecera ────────────────────────────────────────────────
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -188,7 +185,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Selector de Fecha ───────────────────────────────────────────────────────
+  // ── Selector de Fecha ───────────────────────────────────────
   Widget _buildDateSelector() {
     final hoy = DateTime.now();
     final esHoy = _selectedDate.year == hoy.year &&
@@ -196,7 +193,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
         _selectedDate.day == hoy.day;
     final label = esHoy
         ? 'Hoy'
-        : DateFormat('d MMM yyyy', 'es').format(_selectedDate);
+        : DateFormat('d MMM yyyy').format(_selectedDate);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -241,7 +238,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Vista de Error ──────────────────────────────────────────────────────────
+  // ── Vista de Error ──────────────────────────────────────────
   Widget _buildError() {
     return Center(
       child: Padding(
@@ -278,7 +275,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Contenido Principal ─────────────────────────────────────────────────────
+  // ── Contenido Principal ─────────────────────────────────────
   Widget _buildContent() {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
@@ -294,7 +291,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Tarjeta de Resumen del Día ──────────────────────────────────────────────
+  // ── Tarjeta de Resumen del Día ──────────────────────────────
   Widget _buildResumenCard(ResumenDiario r) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -359,7 +356,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Lista de Registros Agrupados por Tipo ───────────────────────────────────
+  // ── Lista de Registros Agrupados por Tipo ───────────────────
   Widget _buildRegistrosPorTipo() {
     if (_registros.isEmpty) {
       return _buildEmptyState();
@@ -481,7 +478,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
                           fontWeight: FontWeight.w600,
                           fontSize: 14)),
                   Text(
-                    '${r.cantidad.toStringAsFixed(0)} ${r.unidad}  ·  ${r.hora.substring(0, 5)}',
+                    '${r.cantidad.toStringAsFixed(0)} ${r.unidad}  ·  ${r.hora.length >= 5 ? r.hora.substring(0, 5) : r.hora}',
                     style:
                         const TextStyle(color: _textSub, fontSize: 12),
                   ),
@@ -510,14 +507,13 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Hoja Inferior (Bottom Sheet): Registrar Alimento ────────────────────────
+  // ── Bottom Sheet: Registrar Alimento ────────────────────────
   void _openAddFoodSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _AddFoodSheet(
-        service: _service,
         selectedDate: _fechaStr,
         onSaved: () {
           Navigator.pop(context);
@@ -529,15 +525,13 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
   }
 }
 
-// ─── Hoja para Registrar Alimento (AddFoodSheet) ──────────────────────────────
+// ─── Bottom Sheet para Registrar Alimento ─────────────────────
 
 class _AddFoodSheet extends StatefulWidget {
-  final AlimentacionService service;
   final String selectedDate;
   final VoidCallback onSaved;
 
   const _AddFoodSheet({
-    required this.service,
     required this.selectedDate,
     required this.onSaved,
   });
@@ -565,7 +559,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
     }
     setState(() => _searching = true);
     try {
-      final r = await widget.service.buscarAlimentos(q);
+      final r = await AlimentacionService.buscarAlimentos(q);
       setState(() => _resultados = r);
     } catch (_) {
       setState(() => _resultados = []);
@@ -588,7 +582,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
     try {
       final horaStr =
           '${_hora.hour.toString().padLeft(2, '0')}:${_hora.minute.toString().padLeft(2, '0')}:00';
-      await widget.service.registrarComida(
+      await AlimentacionService.registrarComida(
         comidaId: _selected!.id,
         cantidad: cant,
         tipoComida: _tipoComida,
@@ -619,7 +613,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Indicador de arrastre (Drag handle)
+            // Drag handle
             Center(
               child: Container(
                 width: 36,
@@ -637,13 +631,13 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
 
-            // ── Búsqueda ──────────────────────────────────────────────────────
+            // ── Búsqueda ──────────────────────────────────────
             _label('Buscar alimento'),
             const SizedBox(height: 6),
             TextField(
               controller: _searchCtrl,
               style: const TextStyle(color: Colors.white),
-              decoration: _inputDeco('Ej: avena, pollo, arroz…',
+              decoration: _inputDeco('Ej: avena, pollo, quinua…',
                   suffix: _searching
                       ? const SizedBox(
                           width: 18,
@@ -658,13 +652,13 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
             if (_resultados.isNotEmpty && _selected == null) ...[
               const SizedBox(height: 8),
               Container(
+                constraints: const BoxConstraints(maxHeight: 200),
                 decoration: BoxDecoration(
                   color: _bg,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: ListView.separated(
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: _resultados.length,
                   separatorBuilder: (_, __) =>
                       const Divider(color: Colors.white12, height: 1),
@@ -675,6 +669,8 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                         setState(() {
                           _selected = c;
                           _searchCtrl.text = c.nombre;
+                          _cantidadCtrl.text =
+                              c.porcionTipica.toStringAsFixed(0);
                           _resultados = [];
                         });
                       },
@@ -708,10 +704,19 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                         color: _orange, size: 18),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(_selected!.nombre,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_selected!.nombre,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600)),
+                          Text(
+                              '${_selected!.calorias?.toStringAsFixed(0) ?? '--'} kcal por ${_selected!.porcionTipica.toStringAsFixed(0)} ${_selected!.unidadMedida}',
+                              style: const TextStyle(
+                                  color: _textSub, fontSize: 11)),
+                        ],
+                      ),
                     ),
                     GestureDetector(
                       onTap: () => setState(() {
@@ -728,7 +733,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
 
             const SizedBox(height: 16),
 
-            // ── Cantidad ──────────────────────────────────────────────────────
+            // ── Cantidad ──────────────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -778,7 +783,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
 
             const SizedBox(height: 16),
 
-            // ── Tipo de Comida ────────────────────────────────────────────────
+            // ── Tipo de Comida ────────────────────────────────
             _label('Tipo de comida'),
             const SizedBox(height: 8),
             Wrap(
@@ -815,7 +820,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
 
             const SizedBox(height: 16),
 
-            // ── Hora ──────────────────────────────────────────────────────────
+            // ── Hora ──────────────────────────────────────────
             _label('Hora de consumo'),
             const SizedBox(height: 6),
             GestureDetector(
@@ -855,7 +860,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
 
             const SizedBox(height: 24),
 
-            // ── Botón Guardar ─────────────────────────────────────────────────
+            // ── Botón Guardar ─────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: GestureDetector(
@@ -894,7 +899,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
     );
   }
 
-  // ── Funciones Auxiliares de UI (Helpers) ────────────────────────────────────
+  // ── Helpers de UI ──────────────────────────────────────────
   Widget _label(String text) {
     return Text(text,
         style: const TextStyle(color: _textSub, fontSize: 12));
@@ -906,7 +911,9 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
       hintStyle: const TextStyle(color: Colors.white38),
       filled: true,
       fillColor: _bg,
-      suffixIcon: suffix != null ? Padding(padding: const EdgeInsets.all(12), child: suffix) : null,
+      suffixIcon: suffix != null
+          ? Padding(padding: const EdgeInsets.all(12), child: suffix)
+          : null,
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       border: OutlineInputBorder(
@@ -916,11 +923,15 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
   }
 
   Widget? _igChip(int? ig) {
-    if (ig == null) return null;
+    if (ig == null || ig == 0) return null;
     Color c;
-    if (ig <= 55) c = _green;
-    else if (ig <= 69) c = _yellow;
-    else c = _redOrange;
+    if (ig <= 55) {
+      c = _green;
+    } else if (ig <= 69) {
+      c = _yellow;
+    } else {
+      c = _redOrange;
+    }
 
     return Container(
       padding:

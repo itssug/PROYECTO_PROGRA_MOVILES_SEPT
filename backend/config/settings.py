@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'core',
     'estado_sueno',
+    'alimentacion',
 ]
 
 MIDDLEWARE = [

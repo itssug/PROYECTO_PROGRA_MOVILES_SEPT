@@ -1,17 +1,26 @@
-import 'dart:async';
-import 'package:intl/intl.dart';
+// ============================================================
+// ARCHIVO: lib/services/alimentacion_service.dart
+// SERVICIO CONECTADO AL BACKEND REAL
+// ============================================================
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
+import 'auth_service.dart';
 
-// ─── Modelos de Respuesta de la API ──────────────────────────────────────────
+// ─── Modelos ─────────────────────────────────────────────────
 
 class ComidaApi {
   final int id;
   final String nombre;
+  final String? descripcion;
   final String categoria;
   final double? calorias;
   final double? carbohidratos;
   final double? azucares;
+  final double? fibra;
   final double? proteinas;
   final double? grasas;
+  final double? sodio;
   final int? indiceGlucemico;
   final double? cargaGlucemica;
   final String unidadMedida;
@@ -21,18 +30,42 @@ class ComidaApi {
   ComidaApi({
     required this.id,
     required this.nombre,
+    this.descripcion,
     required this.categoria,
     this.calorias,
     this.carbohidratos,
     this.azucares,
+    this.fibra,
     this.proteinas,
     this.grasas,
+    this.sodio,
     this.indiceGlucemico,
     this.cargaGlucemica,
     required this.unidadMedida,
     required this.porcionTipica,
     required this.esPersonalizado,
   });
+
+  factory ComidaApi.fromJson(Map<String, dynamic> json) {
+    return ComidaApi(
+      id: json['id'],
+      nombre: json['nombre'] ?? '',
+      descripcion: json['descripcion'],
+      categoria: json['categoria'] ?? '',
+      calorias: _toDouble(json['calorias']),
+      carbohidratos: _toDouble(json['carbohidratos']),
+      azucares: _toDouble(json['azucares']),
+      fibra: _toDouble(json['fibra']),
+      proteinas: _toDouble(json['proteinas']),
+      grasas: _toDouble(json['grasas']),
+      sodio: _toDouble(json['sodio']),
+      indiceGlucemico: json['indice_glucemico'],
+      cargaGlucemica: _toDouble(json['carga_glucemica']),
+      unidadMedida: json['unidad_medida'] ?? 'gramos',
+      porcionTipica: _toDouble(json['porcion_tipica']) ?? 100,
+      esPersonalizado: json['es_personalizado'] == 1 || json['es_personalizado'] == true,
+    );
+  }
 }
 
 class RegistroComidaApi {
@@ -43,7 +76,6 @@ class RegistroComidaApi {
   final double cantidad;
   final String unidad;
   final String tipoComida;
-  final String tipoComidaDisplay;
   final String fecha;
   final String hora;
   final double? caloriasCalculadas;
@@ -60,7 +92,6 @@ class RegistroComidaApi {
     required this.cantidad,
     required this.unidad,
     required this.tipoComida,
-    required this.tipoComidaDisplay,
     required this.fecha,
     required this.hora,
     this.caloriasCalculadas,
@@ -69,6 +100,25 @@ class RegistroComidaApi {
     this.cargaGlucemica,
     this.notas,
   });
+
+  factory RegistroComidaApi.fromJson(Map<String, dynamic> json) {
+    return RegistroComidaApi(
+      id: json['id'],
+      comidaId: json['comida_id'] ?? json['comida'] ?? 0,
+      comidaNombre: json['comida_nombre'] ?? '',
+      comidaCategoria: json['comida_categoria'] ?? '',
+      cantidad: _toDouble(json['cantidad']) ?? 0,
+      unidad: json['unidad'] ?? 'gramos',
+      tipoComida: json['tipo_comida'] ?? '',
+      fecha: json['fecha'] ?? '',
+      hora: json['hora'] ?? '',
+      caloriasCalculadas: _toDouble(json['calorias_calculadas']),
+      carbohidratosCalculados: _toDouble(json['carbohidratos_calculados']),
+      azucaresCalculados: _toDouble(json['azucares_calculados']),
+      cargaGlucemica: _toDouble(json['carga_glucemica_calc']),
+      notas: json['notas'],
+    );
+  }
 }
 
 class ResumenDiario {
@@ -89,9 +139,27 @@ class ResumenDiario {
     required this.cantidadRegistros,
     required this.porTipoComida,
   });
+
+  factory ResumenDiario.fromJson(Map<String, dynamic> json) {
+    final porTipo = <String, double>{};
+    if (json['por_tipo_comida'] != null) {
+      (json['por_tipo_comida'] as Map<String, dynamic>).forEach((k, v) {
+        porTipo[k] = (v is num) ? v.toDouble() : 0;
+      });
+    }
+    return ResumenDiario(
+      fecha: json['fecha'] ?? '',
+      totalCalorias: _toDouble(json['total_calorias']) ?? 0,
+      totalCarbohidratos: _toDouble(json['total_carbohidratos']) ?? 0,
+      totalAzucares: _toDouble(json['total_azucares']) ?? 0,
+      totalCargaGlucemica: _toDouble(json['total_carga_glucemica']) ?? 0,
+      cantidadRegistros: json['cantidad_registros'] ?? 0,
+      porTipoComida: porTipo,
+    );
+  }
 }
 
-// ─── Excepción Personalizada ─────────────────────────────────────────────────
+// ─── Excepción personalizada ─────────────────────────────────
 
 class AlimentacionException implements Exception {
   final String message;
@@ -100,74 +168,195 @@ class AlimentacionException implements Exception {
   String toString() => message;
 }
 
-// ─── Servicio Principal (Datos Simulados / Mock) ─────────────────────────────
+// ─── Helper para parsear decimals de Django ──────────────────
+
+double? _toDouble(dynamic v) {
+  if (v == null) return null;
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  if (v is String) return double.tryParse(v);
+  return null;
+}
+
+// ─── Servicio principal ──────────────────────────────────────
 
 class AlimentacionService {
-  final String _token;
+  static const String _base = '${ApiConfig.baseUrl}/api/alimentacion';
+  static const Duration _timeout = Duration(seconds: 15);
 
-  AlimentacionService({required String token}) : _token = token {
-    _initMockData();
-  }
+  /// Headers con token de autenticación
+  static Map<String, String> get _headers => {
+        'Content-Type': 'application/json',
+        'Authorization': 'Token ${AuthService.token}',
+      };
 
-  // ── Base de Datos Local Simulada en Memoria ───────────────────────────────
-  static int _nextRegistroId = 1000;
-  static bool _initialized = false;
+  // ── BUSCAR ALIMENTOS ────────────────────────────────────────
 
-  // Catálogo adaptado al contexto (Pacientes con Diabetes y dieta local)
-  static final List<ComidaApi> _catalogo = [
-    ComidaApi(id: 1, nombre: 'Avena cocida', categoria: 'Cereales', calorias: 71, carbohidratos: 12, azucares: 0.5, proteinas: 2.5, grasas: 1.4, indiceGlucemico: 55, cargaGlucemica: 6.6, unidadMedida: 'gramos', porcionTipica: 100, esPersonalizado: false),
-    ComidaApi(id: 2, nombre: 'Pechuga de pollo a la plancha', categoria: 'Carnes', calorias: 165, carbohidratos: 0, azucares: 0, proteinas: 31, grasas: 3.6, indiceGlucemico: 0, cargaGlucemica: 0, unidadMedida: 'gramos', porcionTipica: 100, esPersonalizado: false),
-    ComidaApi(id: 3, nombre: 'Quinua cocida', categoria: 'Cereales', calorias: 120, carbohidratos: 21.3, azucares: 0.9, proteinas: 4.4, grasas: 1.9, indiceGlucemico: 53, cargaGlucemica: 11, unidadMedida: 'gramos', porcionTipica: 100, esPersonalizado: false),
-    ComidaApi(id: 4, nombre: 'Sopa de Maní', categoria: 'Sopas', calorias: 280, carbohidratos: 30, azucares: 2, proteinas: 10, grasas: 14, indiceGlucemico: 65, cargaGlucemica: 18, unidadMedida: 'plato', porcionTipica: 1, esPersonalizado: false),
-    ComidaApi(id: 5, nombre: 'Salteña de pollo', categoria: 'Comida Rápida', calorias: 350, carbohidratos: 45, azucares: 15, proteinas: 12, grasas: 18, indiceGlucemico: 75, cargaGlucemica: 30, unidadMedida: 'unidad', porcionTipica: 1, esPersonalizado: false),
-    ComidaApi(id: 6, nombre: 'Manzana verde', categoria: 'Frutas', calorias: 52, carbohidratos: 13.8, azucares: 10.4, proteinas: 0.3, grasas: 0.2, indiceGlucemico: 39, cargaGlucemica: 5, unidadMedida: 'gramos', porcionTipica: 100, esPersonalizado: false),
-    ComidaApi(id: 7, nombre: 'Mate de Coca (sin azúcar)', categoria: 'Bebidas', calorias: 2, carbohidratos: 0.5, azucares: 0, proteinas: 0, grasas: 0, indiceGlucemico: 0, cargaGlucemica: 0, unidadMedida: 'taza', porcionTipica: 1, esPersonalizado: false),
-    ComidaApi(id: 8, nombre: 'Huevo duro', categoria: 'Proteínas', calorias: 155, carbohidratos: 1.1, azucares: 1.1, proteinas: 13, grasas: 11, indiceGlucemico: 0, cargaGlucemica: 0, unidadMedida: 'unidad', porcionTipica: 1, esPersonalizado: false),
-  ];
+  /// Busca alimentos en el catálogo por nombre.
+  static Future<List<ComidaApi>> buscarAlimentos(String query) async {
+    try {
+      final url = '$_base/comidas/?buscar=${Uri.encodeComponent(query)}';
+      final res = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(_timeout);
 
-  static final List<RegistroComidaApi> _registros = [];
-
-  void _initMockData() {
-    if (_initialized) return;
-    
-    // Generar datos para "Hoy" automáticamente
-    final hoy = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    
-    _registros.addAll([
-      RegistroComidaApi(
-        id: _nextRegistroId++, comidaId: 1, comidaNombre: 'Avena cocida', comidaCategoria: 'Cereales', cantidad: 150, unidad: 'gramos', tipoComida: 'desayuno', tipoComidaDisplay: 'Desayuno', fecha: hoy, hora: '07:30:00', caloriasCalculadas: 106.5, carbohidratosCalculados: 18, azucaresCalculados: 0.75, cargaGlucemica: 9.9
-      ),
-      RegistroComidaApi(
-        id: _nextRegistroId++, comidaId: 7, comidaNombre: 'Mate de Coca (sin azúcar)', comidaCategoria: 'Bebidas', cantidad: 1, unidad: 'taza', tipoComida: 'desayuno', tipoComidaDisplay: 'Desayuno', fecha: hoy, hora: '07:45:00', caloriasCalculadas: 2, carbohidratosCalculados: 0.5, azucaresCalculados: 0, cargaGlucemica: 0
-      ),
-      RegistroComidaApi(
-        id: _nextRegistroId++, comidaId: 2, comidaNombre: 'Pechuga de pollo a la plancha', comidaCategoria: 'Carnes', cantidad: 200, unidad: 'gramos', tipoComida: 'almuerzo', tipoComidaDisplay: 'Almuerzo', fecha: hoy, hora: '13:00:00', caloriasCalculadas: 330, carbohidratosCalculados: 0, azucaresCalculados: 0, cargaGlucemica: 0
-      ),
-      RegistroComidaApi(
-        id: _nextRegistroId++, comidaId: 3, comidaNombre: 'Quinua cocida', comidaCategoria: 'Cereales', cantidad: 100, unidad: 'gramos', tipoComida: 'almuerzo', tipoComidaDisplay: 'Almuerzo', fecha: hoy, hora: '13:05:00', caloriasCalculadas: 120, carbohidratosCalculados: 21.3, azucaresCalculados: 0.9, cargaGlucemica: 11
-      ),
-    ]);
-    
-    _initialized = true;
-  }
-
-  // ── Operaciones de Comidas (Catálogo) ───────────────────────────────────────
-
-  Future<List<ComidaApi>> getCatalogo({String? categoria}) async {
-    await Future.delayed(const Duration(milliseconds: 400)); // Simula latencia de red
-    if (categoria != null) {
-      return _catalogo.where((c) => c.categoria.toLowerCase() == categoria.toLowerCase()).toList();
+      if (res.statusCode == 200) {
+        final List data = jsonDecode(res.body);
+        return data.map((e) => ComidaApi.fromJson(e)).toList();
+      }
+      throw AlimentacionException('Error al buscar alimentos: ${res.statusCode}');
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
     }
-    return _catalogo;
   }
 
-  Future<List<ComidaApi>> buscarAlimentos(String query) async {
-    await Future.delayed(const Duration(milliseconds: 500)); 
-    final q = query.toLowerCase();
-    return _catalogo.where((c) => c.nombre.toLowerCase().contains(q)).toList();
+  /// Obtiene todo el catálogo, opcionalmente filtrado por categoría.
+  static Future<List<ComidaApi>> getCatalogo({String? categoria}) async {
+    try {
+      String url = '$_base/comidas/';
+      if (categoria != null) url += '?categoria=${Uri.encodeComponent(categoria)}';
+
+      final res = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        final List data = jsonDecode(res.body);
+        return data.map((e) => ComidaApi.fromJson(e)).toList();
+      }
+      throw AlimentacionException('Error al cargar catálogo: ${res.statusCode}');
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
   }
 
-  Future<ComidaApi> crearAlimentoPersonalizado({
+  // ── REGISTROS DE COMIDAS ────────────────────────────────────
+
+  /// Obtiene los registros de comida del usuario para una fecha.
+  static Future<List<RegistroComidaApi>> getRegistrosDia({String? fecha}) async {
+    try {
+      String url = '$_base/registro/';
+      if (fecha != null) url += '?fecha=$fecha';
+
+      final res = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        final List data = jsonDecode(res.body);
+        return data.map((e) => RegistroComidaApi.fromJson(e)).toList();
+      }
+      if (res.statusCode == 401) {
+        throw AlimentacionException('Sesión expirada. Vuelve a iniciar sesión.');
+      }
+      throw AlimentacionException('Error al cargar registros: ${res.statusCode}');
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  /// Registra una comida consumida.
+  static Future<RegistroComidaApi> registrarComida({
+    required int comidaId,
+    required double cantidad,
+    required String tipoComida,
+    required String fecha,
+    required String hora,
+    String unidad = 'gramos',
+    String? notas,
+  }) async {
+    try {
+      final body = {
+        'comida_id': comidaId,
+        'cantidad': cantidad,
+        'tipo_comida': tipoComida,
+        'fecha': fecha,
+        'hora': hora,
+        'unidad': unidad,
+        if (notas != null && notas.isNotEmpty) 'notas': notas,
+      };
+
+      final res = await http
+          .post(
+            Uri.parse('$_base/registro/'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+
+      if (res.statusCode == 201) {
+        return RegistroComidaApi.fromJson(jsonDecode(res.body));
+      }
+      if (res.statusCode == 401) {
+        throw AlimentacionException('Sesión expirada.');
+      }
+
+      // Intentar extraer mensaje de error
+      try {
+        final error = jsonDecode(res.body);
+        final msg = error.values.first;
+        throw AlimentacionException(
+            msg is List ? msg.first.toString() : msg.toString());
+      } catch (_) {
+        throw AlimentacionException('Error al registrar comida: ${res.statusCode}');
+      }
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  /// Elimina un registro de comida.
+  static Future<void> eliminarRegistro(int registroId) async {
+    try {
+      final res = await http
+          .delete(
+            Uri.parse('$_base/registro/$registroId/'),
+            headers: _headers,
+          )
+          .timeout(_timeout);
+
+      if (res.statusCode != 200) {
+        throw AlimentacionException('Error al eliminar registro: ${res.statusCode}');
+      }
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  // ── RESUMEN DIARIO ──────────────────────────────────────────
+
+  /// Obtiene el resumen nutricional de un día.
+  static Future<ResumenDiario> getResumenDia({String? fecha}) async {
+    try {
+      String url = '$_base/resumen/';
+      if (fecha != null) url += '?fecha=$fecha';
+
+      final res = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        return ResumenDiario.fromJson(jsonDecode(res.body));
+      }
+      if (res.statusCode == 401) {
+        throw AlimentacionException('Sesión expirada.');
+      }
+      throw AlimentacionException('Error al cargar resumen: ${res.statusCode}');
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  // ── ALIMENTOS PERSONALIZADOS ────────────────────────────────
+
+  /// Crea un alimento personalizado en el catálogo.
+  static Future<ComidaApi> crearAlimentoPersonalizado({
     required String nombre,
     required String categoria,
     double? calorias,
@@ -180,111 +369,36 @@ class AlimentacionService {
     double porcionTipica = 100,
     String? descripcion,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    final nuevaComida = ComidaApi(
-      id: _catalogo.length + 1,
-      nombre: nombre,
-      categoria: categoria,
-      calorias: calorias,
-      carbohidratos: carbohidratos,
-      azucares: azucares,
-      proteinas: proteinas,
-      grasas: grasas,
-      indiceGlucemico: indiceGlucemico,
-      cargaGlucemica: 0, 
-      unidadMedida: unidadMedida,
-      porcionTipica: porcionTipica,
-      esPersonalizado: true,
-    );
-    _catalogo.add(nuevaComida);
-    return nuevaComida;
-  }
+    try {
+      final body = {
+        'nombre': nombre,
+        'categoria': categoria,
+        'unidad_medida': unidadMedida,
+        'porcion_tipica': porcionTipica,
+        if (descripcion != null) 'descripcion': descripcion,
+        if (calorias != null) 'calorias': calorias,
+        if (carbohidratos != null) 'carbohidratos': carbohidratos,
+        if (azucares != null) 'azucares': azucares,
+        if (proteinas != null) 'proteinas': proteinas,
+        if (grasas != null) 'grasas': grasas,
+        if (indiceGlucemico != null) 'indice_glucemico': indiceGlucemico,
+      };
 
-  // ── Registro de Comidas consumidas ──────────────────────────────────────────
+      final res = await http
+          .post(
+            Uri.parse('$_base/comidas/crear/'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
 
-  Future<List<RegistroComidaApi>> getRegistrosDia({String? fecha}) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final targetDate = fecha ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
-    return _registros.where((r) => r.fecha == targetDate).toList();
-  }
-
-  Future<RegistroComidaApi> registrarComida({
-    required int comidaId,
-    required double cantidad,
-    required String tipoComida,
-    required String fecha,
-    required String hora,
-    String unidad = 'gramos',
-    String? notas,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    
-    final comida = _catalogo.firstWhere((c) => c.id == comidaId, 
-      orElse: () => throw const AlimentacionException('Comida no encontrada en el catálogo local.'));
-
-    // Calcular macronutrientes proporcionales a la cantidad ingresada
-    double factor = cantidad / comida.porcionTipica;
-
-    final nuevoRegistro = RegistroComidaApi(
-      id: _nextRegistroId++,
-      comidaId: comida.id,
-      comidaNombre: comida.nombre,
-      comidaCategoria: comida.categoria,
-      cantidad: cantidad,
-      unidad: unidad,
-      tipoComida: tipoComida,
-      tipoComidaDisplay: tipoComida.toUpperCase(),
-      fecha: fecha,
-      hora: hora,
-      caloriasCalculadas: (comida.calorias ?? 0) * factor,
-      carbohidratosCalculados: (comida.carbohidratos ?? 0) * factor,
-      azucaresCalculados: (comida.azucares ?? 0) * factor,
-      cargaGlucemica: (comida.cargaGlucemica ?? 0) * factor,
-      notas: notas,
-    );
-
-    _registros.add(nuevoRegistro);
-    return nuevoRegistro;
-  }
-
-  Future<void> eliminarRegistro(int registroId) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    _registros.removeWhere((r) => r.id == registroId);
-  }
-
-  // ── Resúmenes Diarios e Historial ───────────────────────────────────────────
-
-  Future<ResumenDiario> getResumenDia({String? fecha}) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final targetDate = fecha ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
-    
-    final registrosDia = _registros.where((r) => r.fecha == targetDate).toList();
-    
-    double cal = 0, carb = 0, azu = 0, gl = 0;
-    Map<String, double> porTipo = {};
-
-    for (var r in registrosDia) {
-      cal += r.caloriasCalculadas ?? 0;
-      carb += r.carbohidratosCalculados ?? 0;
-      azu += r.azucaresCalculados ?? 0;
-      gl += r.cargaGlucemica ?? 0;
-      
-      porTipo[r.tipoComida] = (porTipo[r.tipoComida] ?? 0) + (r.caloriasCalculadas ?? 0);
+      if (res.statusCode == 201) {
+        return ComidaApi.fromJson(jsonDecode(res.body));
+      }
+      throw AlimentacionException('Error al crear alimento: ${res.statusCode}');
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
     }
-
-    return ResumenDiario(
-      fecha: targetDate,
-      totalCalorias: cal,
-      totalCarbohidratos: carb,
-      totalAzucares: azu,
-      totalCargaGlucemica: gl,
-      cantidadRegistros: registrosDia.length,
-      porTipoComida: porTipo,
-    );
-  }
-
-  Future<List<Map<String, dynamic>>> getHistorial({int dias = 7}) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    return []; // Se devuelve vacío ya que no se utiliza activamente en la UI proporcionada
   }
 }
