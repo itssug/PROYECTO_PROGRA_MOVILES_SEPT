@@ -2,12 +2,17 @@ import os
 from google import genai
 from .query_service import QueryService
 from .memory_service import MemoryService
+from openai import OpenAI
 
 
 class AIService:
 
     def __init__(self):
-        self.client = genai.Client(api_key="")
+        self.client = OpenAI(
+            api_key="",
+            base_url="https://api.groq.com/openai/v1"
+        )
+
         self.query_service = QueryService()
         self.memory_service = MemoryService()
 
@@ -20,7 +25,7 @@ class AIService:
 
         history = self.memory_service.get_recent_history(user_id)
         prompt  = self._build_prompt(question, context_data, history)
-        answer  = self._call_gemini(prompt)
+        answer  = self._call_ai(prompt)
 
         self.memory_service.save_message(user_id=user_id, role="assistant", message=answer)
 
@@ -115,9 +120,33 @@ PREGUNTA DEL PACIENTE:
     def _call_gemini(self, prompt: str) -> str:
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.0-flash",
                 contents=prompt,
             )
             return response.text
+        except Exception as e:
+            return f"Error al contactar con la IA: {str(e)}"
+    def _call_ai(self, prompt: str) -> str:
+
+        try:
+
+            response = self.client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Eres un asistente especializado en diabetes tipo II."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=500
+            )
+
+            return response.choices[0].message.content
+
         except Exception as e:
             return f"Error al contactar con la IA: {str(e)}"
