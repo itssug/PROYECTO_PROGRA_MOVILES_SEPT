@@ -11,6 +11,8 @@ import '../features/estado_sueno/screens/estado_sueno_screen.dart';
 import '../features/ai_module/screens/ai_prediction_screen.dart';
 import 'usuarios/salud.dart';
 import 'usuarios/perfil.dart';
+import '../features/alertas/screens/alertas_screen.dart';
+import '../features/alertas/services/alertas_service.dart'; 
 import 'chat_screen.dart';
 
 import '../services/in_app_alert_service.dart';
@@ -39,15 +41,28 @@ class _MainAppShellState extends State<MainAppShell> {
 
   Future<void> _cargarPerfil() async {
     setState(() => _cargando = true);
+
     try {
       final perfil = await PerfilService.getPerfil();
       setState(() => _perfil = perfil);
+
+      // ── Verifica alertas nutricionales al abrir la app ──
+      try {
+        await AlertasService.verificarLimites();
+      } catch (e) {
+        print('No se pudo verificar alertas: $e');
+      }
+
     } catch (e) {
       print('Error cargando perfil: $e');
+
       if (e.toString().contains('Sesión expirada') ||
           e.toString().contains('Token inválido')) {
         await AuthService.logout();
-        if (mounted) Navigator.pushReplacementNamed(context, '/onboarding');
+
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/onboarding');
+        }
       }
     } finally {
       if (mounted) setState(() => _cargando = false);
@@ -96,7 +111,7 @@ class _MainAppShellState extends State<MainAppShell> {
     } catch (e) {
       debugPrint('Error verificando meds: $e');
     }
-  }
+}
 
   void _recargarPerfil() {
     _cargarPerfil();
@@ -136,7 +151,11 @@ class _MainAppShellState extends State<MainAppShell> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const AlertasScreen(),
+              ));
+            },
           ),
         ],
       ),
@@ -249,6 +268,17 @@ class _MainAppShellState extends State<MainAppShell> {
                     Navigator.pop(context);
                   },
                 ),
+                _buildDrawerItem(
+                  icon: Icons.notifications_active,
+                  text: 'Alertas',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => const AlertasScreen(),
+                    ));
+                  },
+                ),
+
                 const Divider(color: AppColors.border),
                 // ── Motor de IA
                 _buildDrawerItemHighlighted(
@@ -265,10 +295,15 @@ class _MainAppShellState extends State<MainAppShell> {
                   text: 'Estado Emocional y Sueño',
                   onTap: () {
                     Navigator.pop(context);
+                    // Obtiene el id real del usuario desde AuthService
+                    final usuarioId = AuthService.usuario?['id'];
+                    if (usuarioId == null) return;
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const EstadoSuenoScreen(usuarioId: 1), // Assuming user ID 1 for now or fetch dynamically if available
+                        builder: (_) => EstadoSuenoScreen(
+                          
+                        ),
                       ),
                     );
                   },
@@ -337,7 +372,7 @@ class _MainAppShellState extends State<MainAppShell> {
             padding: const EdgeInsets.all(16),
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent.withOpacity(0.1),
+                backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
                 foregroundColor: Colors.redAccent,
                 minimumSize: const Size(double.infinity, 50),
                 shape: RoundedRectangleBorder(
