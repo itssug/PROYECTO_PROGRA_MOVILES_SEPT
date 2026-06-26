@@ -12,5 +12,6 @@ urlpatterns = [
     path('api/', include('actividad_fisica.urls')),
     #chat
     path('api/ai/', include('app.urls')),  # <- esto faltaría
+    path('med-trat/', include('med_trat.urls')),
 
 ]

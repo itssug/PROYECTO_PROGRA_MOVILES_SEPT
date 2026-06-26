@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'ml_engine',
     'alimentacion',
     'app',
+    'med_trat',
 ]
 
 MIDDLEWARE = [

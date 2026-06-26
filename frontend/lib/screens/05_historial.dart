@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../models/registro_model.dart';
+import '../services/registro_service.dart';
 
 class HistorialScreen extends StatefulWidget {
   const HistorialScreen({super.key});
@@ -12,93 +14,167 @@ class _HistorialScreenState extends State<HistorialScreen> {
   String _filtro = 'Todos';
   final List<String> _filtros = ['Todos', 'Tomado', 'Omitido'];
 
-  final List<_RegistroMed> _registros = [
-    _RegistroMed(medicamento: 'Metformina',    dosis: '850 mg', fecha: 'Hoy',   hora: '08:12', fueTomado: true,  notas: null),
-    _RegistroMed(medicamento: 'Glibenclamida', dosis: '5 mg',   fecha: 'Hoy',   hora: '13:05', fueTomado: false, notas: 'Olvidé el medicamento en casa'),
-    _RegistroMed(medicamento: 'Insulina',      dosis: '20 UI',  fecha: 'Ayer',  hora: '22:00', fueTomado: true,  notas: null),
-    _RegistroMed(medicamento: 'Metformina',    dosis: '850 mg', fecha: 'Ayer',  hora: '08:03', fueTomado: true,  notas: null),
-    _RegistroMed(medicamento: 'Glibenclamida', dosis: '5 mg',   fecha: 'Ayer',  hora: '13:00', fueTomado: true,  notas: null),
-    _RegistroMed(medicamento: 'Insulina',      dosis: '18 UI',  fecha: '7 may', hora: '22:15', fueTomado: true,  notas: 'Dosis reducida por indicación médica'),
-    _RegistroMed(medicamento: 'Metformina',    dosis: '850 mg', fecha: '7 may', hora: '08:00', fueTomado: false, notas: null),
-    _RegistroMed(medicamento: 'Glibenclamida', dosis: '5 mg',   fecha: '6 may', hora: '13:00', fueTomado: true,  notas: null),
-  ];
+  List<RegistroMedicamento> _registros = [];
+  Adherencia? _adherencia;
+  bool _cargando = true;
+  String? _error;
 
-  List<_RegistroMed> get _filtrados {
-    if (_filtro == 'Todos') return _registros;
-    return _registros.where((r) => _filtro == 'Tomado' ? r.fueTomado : !r.fueTomado).toList();
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatos();
   }
 
-  Map<String, List<_RegistroMed>> get _agrupados {
-    final result = <String, List<_RegistroMed>>{};
+  Future<void> _cargarDatos() async {
+    setState(() { _cargando = true; _error = null; });
+
+    final resHistorial  = await RegistroService.historial();
+    final resAdherencia = await RegistroService.adherencia();
+
+    if (!mounted) return;
+
+    if (resHistorial.success) {
+      setState(() {
+        _registros  = resHistorial.data ?? [];
+        _adherencia = resAdherencia.data; // puede ser null si falla, no es crítico
+        _cargando   = false;
+      });
+    } else {
+      setState(() {
+        _error    = resHistorial.error;
+        _cargando = false;
+      });
+    }
+  }
+
+  List<RegistroMedicamento> get _filtrados {
+    if (_filtro == 'Todos') return _registros;
+    return _registros.where((r) =>
+        _filtro == 'Tomado' ? r.fueTomado == 1 : r.fueTomado == 0
+    ).toList();
+  }
+
+  /// Agrupa por fecha "YYYY-MM-DD" y devuelve label legible
+  Map<String, List<RegistroMedicamento>> get _agrupados {
+    final hoy  = _fechaStr(DateTime.now());
+    final ayer = _fechaStr(DateTime.now().subtract(const Duration(days: 1)));
+
+    final result = <String, List<RegistroMedicamento>>{};
     for (final r in _filtrados) {
-      result.putIfAbsent(r.fecha, () => []).add(r);
+      final label = r.fecha == hoy
+          ? 'Hoy'
+          : r.fecha == ayer
+              ? 'Ayer'
+              : _formatearFecha(r.fecha);
+      result.putIfAbsent(label, () => []).add(r);
     }
     return result;
   }
 
-  double get _adherencia {
-    final total   = _registros.length;
-    final tomados = _registros.where((r) => r.fueTomado).length;
-    return total == 0 ? 0 : tomados / total;
+  String _fechaStr(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  String _formatearFecha(String fecha) {
+    // "YYYY-MM-DD" → "DD/MM"
+    try {
+      final parts = fecha.split('-');
+      return '${parts[2]}/${parts[1]}';
+    } catch (_) {
+      return fecha;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_cargando) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.accent),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded,
+                color: AppTheme.danger, size: 48),
+            const SizedBox(height: 12),
+            Text(_error!,
+                style: const TextStyle(color: AppTheme.textSecondary),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _cargarDatos,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      );
+    }
+
     final grupos = _agrupados;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Historial'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list_rounded, color: AppTheme.textSecondary),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: ListView(
+    return RefreshIndicator(
+      color: AppTheme.accent,
+      onRefresh: _cargarDatos,
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
         children: [
           // ── Tarjeta de adherencia
-          _AdherenciaCard(porcentaje: _adherencia),
+          _AdherenciaCard(adherencia: _adherencia),
           const SizedBox(height: 20),
 
           // ── Filtros
           _FiltroBar(
-            filtros: _filtros,
+            filtros:      _filtros,
             seleccionado: _filtro,
-            onChanged: (f) => setState(() => _filtro = f),
+            onChanged:    (f) => setState(() => _filtro = f),
           ),
           const SizedBox(height: 20),
 
-          // ── Grupos por fecha
-          for (final entry in grupos.entries) ...[
-            _FechaHeader(fecha: entry.key),
-            ...entry.value.map((r) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _RegistroTile(reg: r),
-            )),
-            const SizedBox(height: 16),
-          ],
+          if (_filtrados.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 40),
+              child: Center(
+                child: Text('Sin registros',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 14)),
+              ),
+            )
+          else
+            for (final entry in grupos.entries) ...[
+              _FechaHeader(fecha: entry.key),
+              ...entry.value.map((r) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _RegistroTile(reg: r),
+                  )),
+              const SizedBox(height: 16),
+            ],
         ],
       ),
     );
   }
 }
 
+// ── Widgets ───────────────────────────────────────────────────────────────────
+
 class _AdherenciaCard extends StatelessWidget {
-  final double porcentaje;
-  const _AdherenciaCard({required this.porcentaje});
+  final Adherencia? adherencia;
+  const _AdherenciaCard({required this.adherencia});
+
+  double get _porcentaje =>
+      adherencia != null ? adherencia!.porcentaje / 100 : 0;
 
   Color get _color {
-    if (porcentaje >= 0.8) return AppTheme.success;
-    if (porcentaje >= 0.6) return AppTheme.warning;
+    if (_porcentaje >= 0.8) return AppTheme.success;
+    if (_porcentaje >= 0.6) return AppTheme.warning;
     return AppTheme.danger;
   }
 
   String get _label {
-    if (porcentaje >= 0.8) return 'Muy buena';
-    if (porcentaje >= 0.6) return 'Regular';
+    if (_porcentaje >= 0.8) return 'Muy buena';
+    if (_porcentaje >= 0.6) return 'Regular';
     return 'Baja';
   }
 
@@ -122,21 +198,24 @@ class _AdherenciaCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Adherencia (últimos 7 días)',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-                const SizedBox(height: 8),
-                Text('${(porcentaje * 100).round()}%',
                     style: TextStyle(
-                        color: _color, fontSize: 36, fontWeight: FontWeight.w800)),
+                        color: AppTheme.textSecondary, fontSize: 12)),
+                const SizedBox(height: 8),
+                Text('${((_porcentaje) * 100).round()}%',
+                    style: TextStyle(
+                        color:      _color,
+                        fontSize:   36,
+                        fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
                 AccentBadge(_label, color: _color),
                 const SizedBox(height: 12),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
-                    value: porcentaje,
-                    minHeight: 6,
+                    value:           _porcentaje,
+                    minHeight:       6,
                     backgroundColor: AppTheme.border,
-                    valueColor: AlwaysStoppedAnimation(_color),
+                    valueColor:      AlwaysStoppedAnimation(_color),
                   ),
                 ),
               ],
@@ -145,31 +224,30 @@ class _AdherenciaCard extends StatelessWidget {
           const SizedBox(width: 20),
           Column(
             children: [
-              _StatItem(value: '${(_registros().where((r) => r.fueTomado).length)}', label: 'Tomados', color: AppTheme.success),
+              _StatItem(
+                value: '${adherencia?.tomados ?? 0}',
+                label: 'Tomados',
+                color: AppTheme.success,
+              ),
               const SizedBox(height: 12),
-              _StatItem(value: '${(_registros().where((r) => !r.fueTomado).length)}', label: 'Omitidos', color: AppTheme.danger),
+              _StatItem(
+                value: '${adherencia?.omitidos ?? 0}',
+                label: 'Omitidos',
+                color: AppTheme.danger,
+              ),
             ],
           ),
         ],
       ),
     );
   }
-
-  List<_RegistroMed> _registros() => [
-    _RegistroMed(medicamento: '', dosis: '', fecha: '', hora: '', fueTomado: true, notas: null),
-    _RegistroMed(medicamento: '', dosis: '', fecha: '', hora: '', fueTomado: true, notas: null),
-    _RegistroMed(medicamento: '', dosis: '', fecha: '', hora: '', fueTomado: true, notas: null),
-    _RegistroMed(medicamento: '', dosis: '', fecha: '', hora: '', fueTomado: true, notas: null),
-    _RegistroMed(medicamento: '', dosis: '', fecha: '', hora: '', fueTomado: true, notas: null),
-    _RegistroMed(medicamento: '', dosis: '', fecha: '', hora: '', fueTomado: false, notas: null),
-    _RegistroMed(medicamento: '', dosis: '', fecha: '', hora: '', fueTomado: false, notas: null),
-  ];
 }
 
 class _StatItem extends StatelessWidget {
   final String value, label;
   final Color color;
-  const _StatItem({required this.value, required this.label, required this.color});
+  const _StatItem(
+      {required this.value, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +258,9 @@ class _StatItem extends StatelessWidget {
                 color: color, fontSize: 22, fontWeight: FontWeight.w800)),
         Text(label,
             style: const TextStyle(
-                color: AppTheme.textMuted, fontSize: 11, fontWeight: FontWeight.w500)),
+                color:      AppTheme.textMuted,
+                fontSize:   11,
+                fontWeight: FontWeight.w500)),
       ],
     );
   }
@@ -191,7 +271,9 @@ class _FiltroBar extends StatelessWidget {
   final String seleccionado;
   final ValueChanged<String> onChanged;
   const _FiltroBar(
-      {required this.filtros, required this.seleccionado, required this.onChanged});
+      {required this.filtros,
+      required this.seleccionado,
+      required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -204,17 +286,18 @@ class _FiltroBar extends StatelessWidget {
             onTap: () => onChanged(f),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: sel ? AppTheme.accent : AppTheme.surface,
+                color:        sel ? AppTheme.accent : AppTheme.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                     color: sel ? AppTheme.accent : AppTheme.border),
               ),
               child: Text(f,
                   style: TextStyle(
-                      color: sel ? Colors.white : AppTheme.textSecondary,
-                      fontSize: 13,
+                      color:      sel ? Colors.white : AppTheme.textSecondary,
+                      fontSize:   13,
                       fontWeight: sel ? FontWeight.w600 : FontWeight.w400)),
             ),
           ),
@@ -230,32 +313,39 @@ class _FechaHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Text(fecha,
-        style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3)),
-  );
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(fecha,
+            style: const TextStyle(
+                color:         AppTheme.textSecondary,
+                fontSize:      13,
+                fontWeight:    FontWeight.w600,
+                letterSpacing: 0.3)),
+      );
 }
 
 class _RegistroTile extends StatelessWidget {
-  final _RegistroMed reg;
+  final RegistroMedicamento reg;
   const _RegistroTile({required this.reg});
 
   @override
   Widget build(BuildContext context) {
-    final color  = reg.fueTomado ? AppTheme.success : AppTheme.danger;
-    final icon   = reg.fueTomado ? Icons.check_circle_rounded : Icons.cancel_rounded;
-    final label  = reg.fueTomado ? 'Tomado' : 'Omitido';
+    final tomado = reg.fueTomado == 1;
+    final color  = tomado ? AppTheme.success : AppTheme.danger;
+    final icon   = tomado ? Icons.check_circle_rounded : Icons.cancel_rounded;
+    final label  = tomado ? 'Tomado' : 'Omitido';
+
+    // hora "HH:MM:SS" → "HH:MM"
+    final hora = reg.hora.length >= 5 ? reg.hora.substring(0, 5) : reg.hora;
+
+    // dosis tomada
+    final dosis = reg.dosisTomada != null ? '${reg.dosisTomada}' : '--';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color:        AppTheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.border),
+        border:       Border.all(color: AppTheme.border),
       ),
       child: Column(
         children: [
@@ -267,13 +357,13 @@ class _RegistroTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(reg.medicamento,
+                    Text('Medicamento #${reg.medicamentoId}',
                         style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 14,
+                            color:      AppTheme.textPrimary,
+                            fontSize:   14,
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
-                    Text('${reg.dosis} · ${reg.hora}',
+                    Text('$dosis · $hora',
                         style: const TextStyle(
                             color: AppTheme.textSecondary, fontSize: 12)),
                   ],
@@ -282,21 +372,23 @@ class _RegistroTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color:        color.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(label,
                     style: TextStyle(
-                        color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+                        color:      color,
+                        fontSize:   11,
+                        fontWeight: FontWeight.w600)),
               ),
             ],
           ),
-          if (reg.notas != null) ...[
+          if (reg.notas != null && reg.notas!.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding:    const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceLight,
+                color:        AppTheme.surfaceLight,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -307,9 +399,9 @@ class _RegistroTile extends StatelessWidget {
                   Expanded(
                     child: Text(reg.notas!,
                         style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic)),
+                            color:      AppTheme.textSecondary,
+                            fontSize:   12,
+                            fontStyle:  FontStyle.italic)),
                   ),
                 ],
               ),
@@ -319,19 +411,4 @@ class _RegistroTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _RegistroMed {
-  final String medicamento, dosis, fecha, hora;
-  final bool fueTomado;
-  final String? notas;
-
-  const _RegistroMed({
-    required this.medicamento,
-    required this.dosis,
-    required this.fecha,
-    required this.hora,
-    required this.fueTomado,
-    required this.notas,
-  });
 }
