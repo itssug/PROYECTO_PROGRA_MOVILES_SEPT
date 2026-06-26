@@ -597,7 +597,11 @@ class _LineChartPainter extends CustomPainter {
     final chartW = size.width - leftPad - rightPad;
     final chartH = size.height - bottomPad - topPad;
     final double minY = 0;
-    final double maxY = 450;
+    
+    double maxData = 0;
+    for (final v in goalData) if (v > maxData) maxData = v;
+    for (final v in actualData) if (v > maxData) maxData = v;
+    final double maxY = maxData <= 0 ? 100 : (maxData / 500).ceil() * 500.0;
 
     // Líneas del eje Y
     final gridPaint = Paint()
@@ -612,9 +616,10 @@ class _LineChartPainter extends CustomPainter {
         gridPaint,
       );
       // Etiquetas del eje Y
+      final stepValue = (maxY / 4) * i;
       final tp = TextPainter(
         text: TextSpan(
-          text: '${(i * 100).toInt()}',
+          text: '${stepValue.toInt()}',
           style: const TextStyle(color: Color(0xFF4B0082), fontSize: 9),
         ),
         textDirection: TextDirection.ltr,

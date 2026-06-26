@@ -37,11 +37,13 @@ class AIService:
         ) or "Sin historial previo."
 
         perfil    = context.get("perfil", {})
+        ultima_g  = context.get("ultima_glucosa", {})
         g_hoy     = context.get("glucosa_hoy", [])
         g_semana  = context.get("glucosa_semana", {})
         g_global  = context.get("glucosa_global", {})
         objetivos = context.get("objetivos", {})
-        
+        consumos  = context.get("consumos_hoy", {})
+        modelo_ml = context.get("modelo_prediccion", "Desconocido")
 
         if g_hoy:
             glucosa_hoy_text = "\n".join(
@@ -81,6 +83,16 @@ class AIService:
         else:
             global_text = "  Sin datos históricos suficientes."
 
+        if ultima_g:
+            ultima_g_text = f"  Nivel: {ultima_g['nivel']} mg/dL | Fecha: {ultima_g['fecha']} {ultima_g['hora']} | Tipo: {ultima_g['tipo_medicion']}"
+        else:
+            ultima_g_text = "  Sin mediciones registradas."
+
+        if consumos:
+            consumos_text = f"  Calorías: {consumos['calorias']} kcal | Carbohidratos: {consumos['carbohidratos']} g | Comidas registradas: {consumos['total_comidas']}"
+        else:
+            consumos_text = "  Sin alimentos registrados hoy."
+
         return f"""Eres un asistente médico especializado en diabetes tipo II.
 Estás hablando directamente con el paciente. Usa sus datos reales para responder.
 
@@ -98,8 +110,14 @@ PERFIL DEL PACIENTE:
   Nivel de actividad: {perfil.get('nivel_actividad', 'N/A')}
   HbA1c inicial: {perfil.get('hba1c_inicial', 'N/A')}
 
+ÚLTIMA GLUCOSA REGISTRADA:
+{ultima_g_text}
+
 GLUCOSA DE HOY:
 {glucosa_hoy_text}
+
+CONSUMO DE ALIMENTOS DE HOY:
+{consumos_text}
 
 RESUMEN ÚLTIMOS 7 DÍAS:
 {semana_text}
@@ -109,6 +127,10 @@ GLUCOSA GLOBAL:
 
 OBJETIVOS DE GLUCOSA:
 {obj_text}
+
+SISTEMA DE PREDICCIÓN ML (MACHINE LEARNING):
+Actualmente, para las predicciones de glucosa de este paciente se está utilizando el modelo: {modelo_ml}.
+(Nota importante para ti como asistente: El sistema cuenta con 2 modelos: el Global para pacientes nuevos y el Personalizado para pacientes con suficientes datos. Menciónale al usuario cuál se está usando y por qué si pregunta por las predicciones o sobre la Inteligencia Artificial).
 
 HISTORIAL DE CONVERSACIÓN:
 {history_text}

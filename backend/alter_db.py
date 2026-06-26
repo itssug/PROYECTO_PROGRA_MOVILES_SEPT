@@ -12,8 +12,8 @@ from django.db import connection
 def run():
     with connection.cursor() as cursor:
         try:
-            cursor.execute("ALTER TABLE analisis_glucosa ADD COLUMN medicamento_tomado INT DEFAULT 0;")
-            print("Successfully added medicamento_tomado to analisis_glucosa")
+            cursor.execute("ALTER TABLE alertas MODIFY tipo VARCHAR(50);")
+            print("Successfully altered tipo to VARCHAR(50) in alertas")
         except Exception as e:
             print(f"Error or column already exists: {e}")
 
