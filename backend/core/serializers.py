@@ -2,7 +2,7 @@
 # ARCHIVO: core/serializers.py
 # ============================================================
 from rest_framework import serializers
-from .models import Usuarios
+from .models import Usuarios, Glucosa
 import hashlib
 from django.db import connection
 
@@ -76,3 +76,9 @@ class UsuarioPublicoSerializer(serializers.ModelSerializer):
             cursor.execute("SELECT imc FROM usuarios WHERE id = %s", [obj.id])
             row = cursor.fetchone()
         return float(row[0]) if row and row[0] else None
+
+
+class GlucosaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Glucosa
+        fields = '__all__'
