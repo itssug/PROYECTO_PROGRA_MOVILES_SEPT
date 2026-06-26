@@ -4,17 +4,25 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
-// ─── Modelos de Respuesta de la API ──────────────────────────────────────────
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
+import 'auth_service.dart';
+
+// ─── Modelos ─────────────────────────────────────────────────
 
 class ComidaApi {
   final int id;
   final String nombre;
+  final String? descripcion;
   final String categoria;
   final double? calorias;
   final double? carbohidratos;
   final double? azucares;
+  final double? fibra;
   final double? proteinas;
   final double? grasas;
+  final double? sodio;
   final int? indiceGlucemico;
   final double? cargaGlucemica;
   final String unidadMedida;
@@ -24,12 +32,15 @@ class ComidaApi {
   ComidaApi({
     required this.id,
     required this.nombre,
+    this.descripcion,
     required this.categoria,
     this.calorias,
     this.carbohidratos,
     this.azucares,
+    this.fibra,
     this.proteinas,
     this.grasas,
+    this.sodio,
     this.indiceGlucemico,
     this.cargaGlucemica,
     required this.unidadMedida,
@@ -40,18 +51,21 @@ class ComidaApi {
   factory ComidaApi.fromJson(Map<String, dynamic> json) {
     return ComidaApi(
       id: json['id'],
-      nombre: json['nombre'],
-      categoria: json['categoria'],
-      calorias: json['calorias'] != null ? double.parse(json['calorias'].toString()) : null,
-      carbohidratos: json['carbohidratos'] != null ? double.parse(json['carbohidratos'].toString()) : null,
-      azucares: json['azucares'] != null ? double.parse(json['azucares'].toString()) : null,
-      proteinas: json['proteinas'] != null ? double.parse(json['proteinas'].toString()) : null,
-      grasas: json['grasas'] != null ? double.parse(json['grasas'].toString()) : null,
-      indiceGlucemico: json['indiceGlucemico'],
-      cargaGlucemica: json['cargaGlucemica'] != null ? double.parse(json['cargaGlucemica'].toString()) : null,
-      unidadMedida: json['unidadMedida'] ?? 'gramos',
-      porcionTipica: json['porcionTipica'] != null ? double.parse(json['porcionTipica'].toString()) : 100.0,
-      esPersonalizado: json['esPersonalizado'] ?? false,
+      nombre: json['nombre'] ?? '',
+      descripcion: json['descripcion'],
+      categoria: json['categoria'] ?? '',
+      calorias: _toDouble(json['calorias']),
+      carbohidratos: _toDouble(json['carbohidratos']),
+      azucares: _toDouble(json['azucares']),
+      fibra: _toDouble(json['fibra']),
+      proteinas: _toDouble(json['proteinas']),
+      grasas: _toDouble(json['grasas']),
+      sodio: _toDouble(json['sodio']),
+      indiceGlucemico: json['indice_glucemico'],
+      cargaGlucemica: _toDouble(json['carga_glucemica']),
+      unidadMedida: json['unidad_medida'] ?? 'gramos',
+      porcionTipica: _toDouble(json['porcion_tipica']) ?? 100,
+      esPersonalizado: json['es_personalizado'] == 1 || json['es_personalizado'] == true,
     );
   }
 }
@@ -64,7 +78,6 @@ class RegistroComidaApi {
   final double cantidad;
   final String unidad;
   final String tipoComida;
-  final String tipoComidaDisplay;
   final String fecha;
   final String hora;
   final double? caloriasCalculadas;
@@ -81,7 +94,6 @@ class RegistroComidaApi {
     required this.cantidad,
     required this.unidad,
     required this.tipoComida,
-    required this.tipoComidaDisplay,
     required this.fecha,
     required this.hora,
     this.caloriasCalculadas,
@@ -94,19 +106,18 @@ class RegistroComidaApi {
   factory RegistroComidaApi.fromJson(Map<String, dynamic> json) {
     return RegistroComidaApi(
       id: json['id'],
-      comidaId: json['comidaId'],
-      comidaNombre: json['comidaNombre'] ?? '',
-      comidaCategoria: json['comidaCategoria'] ?? '',
-      cantidad: double.parse(json['cantidad'].toString()),
+      comidaId: json['comida_id'] ?? json['comida'] ?? 0,
+      comidaNombre: json['comida_nombre'] ?? '',
+      comidaCategoria: json['comida_categoria'] ?? '',
+      cantidad: _toDouble(json['cantidad']) ?? 0,
       unidad: json['unidad'] ?? 'gramos',
-      tipoComida: json['tipoComida'] ?? '',
-      tipoComidaDisplay: json['tipoComidaDisplay'] ?? '',
-      fecha: json['fecha'],
-      hora: json['hora'],
-      caloriasCalculadas: json['caloriasCalculadas'] != null ? double.parse(json['caloriasCalculadas'].toString()) : null,
-      carbohidratosCalculados: json['carbohidratosCalculados'] != null ? double.parse(json['carbohidratosCalculados'].toString()) : null,
-      azucaresCalculados: json['azucaresCalculados'] != null ? double.parse(json['azucaresCalculados'].toString()) : null,
-      cargaGlucemica: json['cargaGlucemica'] != null ? double.parse(json['cargaGlucemica'].toString()) : null,
+      tipoComida: json['tipo_comida'] ?? '',
+      fecha: json['fecha'] ?? '',
+      hora: json['hora'] ?? '',
+      caloriasCalculadas: _toDouble(json['calorias_calculadas']),
+      carbohidratosCalculados: _toDouble(json['carbohidratos_calculados']),
+      azucaresCalculados: _toDouble(json['azucares_calculados']),
+      cargaGlucemica: _toDouble(json['carga_glucemica_calc']),
       notas: json['notas'],
     );
   }
@@ -132,26 +143,25 @@ class ResumenDiario {
   });
 
   factory ResumenDiario.fromJson(Map<String, dynamic> json) {
-    Map<String, double> tipoComidaMap = {};
-    if (json['porTipoComida'] != null) {
-      json['porTipoComida'].forEach((k, v) {
-        tipoComidaMap[k] = double.parse(v.toString());
+    final porTipo = <String, double>{};
+    if (json['por_tipo_comida'] != null) {
+      (json['por_tipo_comida'] as Map<String, dynamic>).forEach((k, v) {
+        porTipo[k] = (v is num) ? v.toDouble() : 0;
       });
     }
-
     return ResumenDiario(
       fecha: json['fecha'] ?? '',
-      totalCalorias: json['totalCalorias'] != null ? double.parse(json['totalCalorias'].toString()) : 0.0,
-      totalCarbohidratos: json['totalCarbohidratos'] != null ? double.parse(json['totalCarbohidratos'].toString()) : 0.0,
-      totalAzucares: json['totalAzucares'] != null ? double.parse(json['totalAzucares'].toString()) : 0.0,
-      totalCargaGlucemica: json['totalCargaGlucemica'] != null ? double.parse(json['totalCargaGlucemica'].toString()) : 0.0,
-      cantidadRegistros: json['cantidadRegistros'] ?? 0,
-      porTipoComida: tipoComidaMap,
+      totalCalorias: _toDouble(json['total_calorias']) ?? 0,
+      totalCarbohidratos: _toDouble(json['total_carbohidratos']) ?? 0,
+      totalAzucares: _toDouble(json['total_azucares']) ?? 0,
+      totalCargaGlucemica: _toDouble(json['total_carga_glucemica']) ?? 0,
+      cantidadRegistros: json['cantidad_registros'] ?? 0,
+      porTipoComida: porTipo,
     );
   }
 }
 
-// ─── Excepción Personalizada ─────────────────────────────────────────────────
+// ─── Excepción personalizada ─────────────────────────────────
 
 class AlimentacionException implements Exception {
   final String message;
@@ -160,55 +170,266 @@ class AlimentacionException implements Exception {
   String toString() => message;
 }
 
-// ─── Servicio Principal (Conexión Real Backend) ──────────────────────────────
+// ─── Helper para parsear decimals de Django ──────────────────
+
+double? _toDouble(dynamic v) {
+  if (v == null) return null;
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  if (v is String) return double.tryParse(v);
+  return null;
+}
+
+// ─── Servicio principal ──────────────────────────────────────
 
 class AlimentacionService {
-  final String _token;
+  static const String _base = '${ApiConfig.baseUrl}/api/alimentacion';
+  static const Duration _timeout = Duration(seconds: 15);
 
-  AlimentacionService({required String token}) : _token = token;
-
-  Map<String, String> get _headers => {
+  static Map<String, String> get _headers => {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_token',
+        'Authorization': 'Token ${AuthService.token}',
       };
 
-  // ── Operaciones de Comidas (Catálogo) ───────────────────────────────────────
+  // ── BUSCAR ALIMENTOS ────────────────────────────────────────
 
-  Future<List<ComidaApi>> getCatalogo({String? categoria}) async {
+  static Future<List<ComidaApi>> buscarAlimentos(String query) async {
     try {
-      final uri = Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/catalogo/').replace(
-          queryParameters: categoria != null ? {'categoria': categoria} : null);
-          
-      final response = await http.get(uri, headers: _headers);
-      if (response.statusCode == 200) {
-        List jsonResponse = json.decode(response.body);
-        return jsonResponse.map((c) => ComidaApi.fromJson(c)).toList();
-      } else {
-        throw const AlimentacionException('Error al cargar el catálogo de comidas.');
+      final url = '$_base/comidas/?buscar=${Uri.encodeComponent(query)}';
+      final res = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        final List data = jsonDecode(res.body);
+        return data.map((e) => ComidaApi.fromJson(e)).toList();
       }
+      throw AlimentacionException('Error al buscar alimentos: ${res.statusCode}');
     } catch (e) {
-      throw AlimentacionException('Fallo de conexión: $e');
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
     }
   }
 
-  Future<List<ComidaApi>> buscarAlimentos(String query) async {
+  static Future<List<ComidaApi>> getCatalogo({String? categoria}) async {
     try {
-      final uri = Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/buscar/').replace(
-          queryParameters: {'q': query});
-          
-      final response = await http.get(uri, headers: _headers);
-      if (response.statusCode == 200) {
-        List jsonResponse = json.decode(response.body);
-        return jsonResponse.map((c) => ComidaApi.fromJson(c)).toList();
-      } else {
-        throw const AlimentacionException('Error al buscar alimentos.');
+      String url = '$_base/comidas/';
+      if (categoria != null) url += '?categoria=${Uri.encodeComponent(categoria)}';
+
+      final res = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        final List data = jsonDecode(res.body);
+        return data.map((e) => ComidaApi.fromJson(e)).toList();
       }
+      throw AlimentacionException('Error al cargar catálogo: ${res.statusCode}');
     } catch (e) {
-      throw AlimentacionException('Fallo de conexión: $e');
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
     }
   }
 
-  Future<ComidaApi> crearAlimentoPersonalizado({
+  // ── REGISTROS DE COMIDAS ────────────────────────────────────
+
+  static Future<List<RegistroComidaApi>> getRegistrosDia({String? fecha}) async {
+    try {
+      String url = '$_base/registro/';
+      if (fecha != null) url += '?fecha=$fecha';
+
+      final res = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        final List data = jsonDecode(res.body);
+        return data.map((e) => RegistroComidaApi.fromJson(e)).toList();
+      }
+      if (res.statusCode == 401) {
+        throw AlimentacionException('Sesión expirada. Vuelve a iniciar sesión.');
+      }
+      throw AlimentacionException('Error al cargar registros: ${res.statusCode}');
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  static Future<RegistroComidaApi> registrarComida({
+    required int comidaId,
+    required double cantidad,
+    required String tipoComida,
+    required String fecha,
+    required String hora,
+    String unidad = 'gramos',
+    String? notas,
+  }) async {
+    try {
+      final body = {
+        'comida_id': comidaId,
+        'cantidad': cantidad,
+        'tipo_comida': tipoComida,
+        'fecha': fecha,
+        'hora': hora,
+        'unidad': unidad,
+        if (notas != null && notas.isNotEmpty) 'notas': notas,
+      };
+
+      final res = await http
+          .post(
+            Uri.parse('$_base/registro/'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+
+      if (res.statusCode == 201) {
+        return RegistroComidaApi.fromJson(jsonDecode(res.body));
+      }
+      if (res.statusCode == 401) {
+        throw AlimentacionException('Sesión expirada.');
+      }
+
+      try {
+        final error = jsonDecode(res.body);
+        final msg = error.values.first;
+        throw AlimentacionException(
+            msg is List ? msg.first.toString() : msg.toString());
+      } catch (_) {
+        throw AlimentacionException('Error al registrar comida: ${res.statusCode}');
+      }
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  // ── NUEVO: EDITAR REGISTRO DE COMIDA ────────────────────────
+  static Future<RegistroComidaApi> editarRegistro({
+    required int registroId,
+    double? cantidad,
+    String? tipoComida,
+    String? hora,
+    String? unidad,
+    String? notas,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (cantidad != null) body['cantidad'] = cantidad;
+      if (tipoComida != null) body['tipo_comida'] = tipoComida;
+      if (hora != null) body['hora'] = hora;
+      if (unidad != null) body['unidad'] = unidad;
+      if (notas != null) body['notas'] = notas;
+
+      final res = await http
+          .put(
+            Uri.parse('$_base/registro/$registroId/'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        return RegistroComidaApi.fromJson(jsonDecode(res.body));
+      }
+      if (res.statusCode == 401) {
+        throw AlimentacionException('Sesión expirada.');
+      }
+      if (res.statusCode == 404) {
+        throw AlimentacionException('Registro no encontrado.');
+      }
+
+      try {
+        final error = jsonDecode(res.body);
+        final msg = error.values.first;
+        throw AlimentacionException(
+            msg is List ? msg.first.toString() : msg.toString());
+      } catch (_) {
+        throw AlimentacionException('Error al editar registro: ${res.statusCode}');
+      }
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getResumenHistorico({int dias = 7}) async {
+    try {
+      final res = await http
+          .get(Uri.parse('$_base/historico/?dias=$dias'), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      throw AlimentacionException('Error al cargar historial.');
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  static Future<List<dynamic>> getDietasCatalogo() async {
+    try {
+      final res = await http
+          .get(Uri.parse('$_base/dietas/'), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as List<dynamic>;
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  static Future<void> eliminarRegistro(int registroId) async {
+    try {
+      final res = await http
+          .delete(
+            Uri.parse('$_base/registro/$registroId/'),
+            headers: _headers,
+          )
+          .timeout(_timeout);
+
+      if (res.statusCode != 200) {
+        throw AlimentacionException('Error al eliminar registro: ${res.statusCode}');
+      }
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  // ── RESUMEN DIARIO ──────────────────────────────────────────
+
+  static Future<ResumenDiario> getResumenDia({String? fecha}) async {
+    try {
+      String url = '$_base/resumen/';
+      if (fecha != null) url += '?fecha=$fecha';
+
+      final res = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        return ResumenDiario.fromJson(jsonDecode(res.body));
+      }
+      if (res.statusCode == 401) {
+        throw AlimentacionException('Sesión expirada.');
+      }
+      throw AlimentacionException('Error al cargar resumen: ${res.statusCode}');
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  // ── ALIMENTOS PERSONALIZADOS ────────────────────────────────
+
+  static Future<ComidaApi> crearAlimentoPersonalizado({
     required String nombre,
     required String categoria,
     double? calorias,
@@ -222,123 +443,35 @@ class AlimentacionService {
     String? descripcion,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/catalogo/'),
-        headers: _headers,
-        body: json.encode({
-          'nombre': nombre,
-          'categoria': categoria,
-          'calorias': calorias,
-          'carbohidratos': carbohidratos,
-          'azucares': azucares,
-          'proteinas': proteinas,
-          'grasas': grasas,
-          'indiceGlucemico': indiceGlucemico,
-          'unidadMedida': unidadMedida,
-          'porcionTipica': porcionTipica,
-          'descripcion': descripcion,
-        }),
-      );
+      final body = {
+        'nombre': nombre,
+        'categoria': categoria,
+        'unidad_medida': unidadMedida,
+        'porcion_tipica': porcionTipica,
+        if (descripcion != null) 'descripcion': descripcion,
+        if (calorias != null) 'calorias': calorias,
+        if (carbohidratos != null) 'carbohidratos': carbohidratos,
+        if (azucares != null) 'azucares': azucares,
+        if (proteinas != null) 'proteinas': proteinas,
+        if (grasas != null) 'grasas': grasas,
+        if (indiceGlucemico != null) 'indice_glucemico': indiceGlucemico,
+      };
 
-      if (response.statusCode == 201) {
-        return ComidaApi.fromJson(json.decode(response.body));
-      } else {
-        throw const AlimentacionException('Error al crear el alimento personalizado.');
+      final res = await http
+          .post(
+            Uri.parse('$_base/comidas/crear/'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+
+      if (res.statusCode == 201) {
+        return ComidaApi.fromJson(jsonDecode(res.body));
       }
+      throw AlimentacionException('Error al crear alimento: ${res.statusCode}');
     } catch (e) {
-      throw AlimentacionException('Fallo de conexión: $e');
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
     }
-  }
-
-  // ── Registro de Comidas consumidas ──────────────────────────────────────────
-
-  Future<List<RegistroComidaApi>> getRegistrosDia({String? fecha}) async {
-    try {
-      final targetDate = fecha ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final uri = Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/registros/').replace(
-          queryParameters: {'fecha': targetDate});
-          
-      final response = await http.get(uri, headers: _headers);
-      if (response.statusCode == 200) {
-        List jsonResponse = json.decode(response.body);
-        return jsonResponse.map((r) => RegistroComidaApi.fromJson(r)).toList();
-      } else {
-        throw const AlimentacionException('Error al cargar registros del día.');
-      }
-    } catch (e) {
-      throw AlimentacionException('Fallo de conexión: $e');
-    }
-  }
-
-  Future<RegistroComidaApi> registrarComida({
-    required int comidaId,
-    required double cantidad,
-    required String tipoComida,
-    required String fecha,
-    required String hora,
-    String unidad = 'gramos',
-    String? notas,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/registros/'),
-        headers: _headers,
-        body: json.encode({
-          'comidaId': comidaId,
-          'cantidad': cantidad,
-          'tipoComida': tipoComida,
-          'fecha': fecha,
-          'hora': hora,
-          'unidad': unidad,
-          'notas': notas,
-        }),
-      );
-
-      if (response.statusCode == 201) {
-        return RegistroComidaApi.fromJson(json.decode(response.body));
-      } else {
-        throw const AlimentacionException('Error al registrar la comida.');
-      }
-    } catch (e) {
-      throw AlimentacionException('Fallo de conexión: $e');
-    }
-  }
-
-  Future<void> eliminarRegistro(int registroId) async {
-    try {
-      final response = await http.delete(
-        Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/registros/$registroId/'),
-        headers: _headers,
-      );
-
-      if (response.statusCode != 204) {
-        throw const AlimentacionException('Error al eliminar el registro.');
-      }
-    } catch (e) {
-      throw AlimentacionException('Fallo de conexión: $e');
-    }
-  }
-
-  // ── Resúmenes Diarios e Historial ───────────────────────────────────────────
-
-  Future<ResumenDiario> getResumenDia({String? fecha}) async {
-    try {
-      final targetDate = fecha ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final uri = Uri.parse('${ApiConfig.baseUrl}/api/alimentacion/resumen/').replace(
-          queryParameters: {'fecha': targetDate});
-          
-      final response = await http.get(uri, headers: _headers);
-      if (response.statusCode == 200) {
-        return ResumenDiario.fromJson(json.decode(response.body));
-      } else {
-        throw const AlimentacionException('Error al cargar el resumen diario.');
-      }
-    } catch (e) {
-      throw AlimentacionException('Fallo de conexión: $e');
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> getHistorial({int dias = 7}) async {
-    return []; // Aún no implementado en backend.
   }
 }

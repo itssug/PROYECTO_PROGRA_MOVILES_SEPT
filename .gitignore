@@ -52,3 +52,7 @@ Thumbs.db
 *.py[cod]
 *.pyc
 *.pyo
+
+backend/exportar_proyecto.py
+backend/proyecto_completo.txt
+frontend/repomix-output.xml

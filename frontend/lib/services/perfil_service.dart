@@ -1,6 +1,4 @@
-// ============================================================
-// ARCHIVO: lib/services/perfil_service.dart (VERSIÓN CORREGIDA)
-// ============================================================
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;

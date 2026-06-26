@@ -1,6 +1,9 @@
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:frontend/models/diet_model.dart';
 import 'package:frontend/screens/alimentacion/diet_detail_screen.dart';
+import '../../services/alimentacion_service.dart';
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
@@ -17,12 +20,113 @@ class DietsScreen extends StatefulWidget {
 }
 
 class _DietsScreenState extends State<DietsScreen> {
-  int _selectedTab = 0; // 0=Todas las Dietas, 1=Mis Dietas
+  int _selectedTab = 0;
+  List<Diet> _allDiets = [];
+  bool _isLoading = true;
+  String? _error;  // ← NUEVO
 
-  List<Diet> get _myDiets => mockAllDiets.where((d) => d.isMyDiet).toList();
+  List<Diet> get _myDiets => _allDiets.where((d) => d.isMyDiet).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDiets();
+  }
+
+  Future<void> _loadDiets() async {
+    setState(() { _isLoading = true; _error = null; });  // ← Limpia error
+    try {
+      final rawData = await AlimentacionService.getDietasCatalogo();
+      final prefs = await SharedPreferences.getInstance();
+      final myDietIds = prefs.getStringList('my_diets') ?? [];
+
+      List<Diet> parsed = rawData.map<Diet>((e) {
+        String rawId = e['id'].toString().replaceAll(RegExp(r'[^0-9]'), '');
+        int dietId = int.tryParse(rawId) ?? 0;
+
+        return Diet(
+          id: dietId,
+          name: e['name'],
+          description: e['description'],
+          goal: e['goal'],
+          calories: e['calories'],
+          proteinGrams: e['proteinGrams'],
+          proteinPercent: (e['proteinPercent'] as num).toInt(),
+          carbsGrams: e['carbsGrams'],
+          carbsPercent: (e['carbsPercent'] as num).toInt(),
+          fatGrams: e['fatGrams'],
+          fatPercent: (e['fatPercent'] as num).toInt(),
+          imageAsset: '',
+        );
+      }).toList();
+
+      for (var diet in parsed) {
+        if (myDietIds.contains(diet.id.toString())) diet.isMyDiet = true;
+      }
+
+      setState(() {
+        _allDiets = parsed;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'No se pudieron cargar las dietas.\nVerifica tu conexión.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleMyDiet(Diet diet, bool add) async {
+    setState(() => diet.isMyDiet = add);
+    final prefs = await SharedPreferences.getInstance();
+    final myDietIds = _allDiets
+        .where((d) => d.isMyDiet)
+        .map<String>((d) => d.id.toString())
+        .toList();
+    await prefs.setStringList('my_diets', myDietIds);
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: _bg,
+        body: Center(child: CircularProgressIndicator(color: _orange)),
+      );
+    }
+
+    // ── NUEVO: Vista de error con botón reintentar ──
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: _bg,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.wifi_off_rounded, color: Colors.white24, size: 56),
+                const SizedBox(height: 16),
+                Text(_error!, textAlign: TextAlign.center,
+                    style: const TextStyle(color: _textSub, fontSize: 14)),
+                const SizedBox(height: 24),
+                GestureDetector(
+                  onTap: _loadDiets,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                        color: _orange, borderRadius: BorderRadius.circular(30)),
+                    child: const Text('Reintentar',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
@@ -47,7 +151,7 @@ class _DietsScreenState extends State<DietsScreen> {
     );
   }
 
-  // ── Cabecera (Header) ───────────────────────────────────────────────────────
+  // ── Cabecera ────────────────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -70,15 +174,14 @@ class _DietsScreenState extends State<DietsScreen> {
               color: _card,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.search_rounded,
-                color: Colors.white, size: 20),
+            child: const Icon(Icons.search_rounded, color: Colors.white, size: 20),
           ),
         ],
       ),
     );
   }
 
-  // ── Selector de Pestañas (Tab selector) ─────────────────────────────────────
+  // ── Selector de Pestañas ────────────────────────────────────────────────────
   Widget _buildTabSelector() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -129,7 +232,6 @@ class _DietsScreenState extends State<DietsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Banner
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -166,7 +268,7 @@ class _DietsScreenState extends State<DietsScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          ...mockAllDiets.map((diet) => _buildDietCard(diet)),
+          ..._allDiets.map((diet) => _buildDietCard(diet)),
           const SizedBox(height: 20),
         ],
       ),
@@ -199,13 +301,12 @@ class _DietsScreenState extends State<DietsScreen> {
     );
   }
 
-  // ── Estado vacío (Empty state) ──────────────────────────────────────────────
+  // ── Estado vacío ────────────────────────────────────────────────────────────
   Widget _buildEmptyMyDiets() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Espacio para la ilustración
           Container(
             width: 200,
             height: 200,
@@ -213,18 +314,12 @@ class _DietsScreenState extends State<DietsScreen> {
               color: _card,
               shape: BoxShape.circle,
             ),
-            child: Center(
-              child: _EmptyStateIllustration(),
-            ),
+            child: Center(child: _EmptyStateIllustration()),
           ),
           const SizedBox(height: 32),
           const Text(
             'Aún no hay Planes de Dieta.',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           const Text(
@@ -236,19 +331,14 @@ class _DietsScreenState extends State<DietsScreen> {
           GestureDetector(
             onTap: () => setState(() => _selectedTab = 0),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
               decoration: BoxDecoration(
                 color: _orange,
                 borderRadius: BorderRadius.circular(40),
               ),
               child: const Text(
                 'Explorar Dietas',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ),
@@ -267,7 +357,7 @@ class _DietsScreenState extends State<DietsScreen> {
             builder: (_) => DietDetailScreen(
               diet: diet,
               onAddToMyDiet: (d) {
-                setState(() => d.isMyDiet = true);
+                _toggleMyDiet(d, true);
               },
             ),
           ),
@@ -282,10 +372,8 @@ class _DietsScreenState extends State<DietsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Área de la imagen
             ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               child: Container(
                 height: 200,
                 width: double.infinity,
@@ -314,19 +402,17 @@ class _DietsScreenState extends State<DietsScreen> {
                       if (showRemove)
                         GestureDetector(
                           onTap: () {
-                            setState(() => diet.isMyDiet = false);
+                            _toggleMyDiet(diet, false);
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
                               color: Colors.red.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Text(
                               'Quitar',
-                              style: TextStyle(
-                                  color: Colors.redAccent, fontSize: 12),
+                              style: TextStyle(color: Colors.redAccent, fontSize: 12),
                             ),
                           ),
                         ),
@@ -366,28 +452,14 @@ class _DietImagePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // NOTA: Se actualizaron las claves al español para que coincidan con la traducción.
     final colors = {
-      'Estilo de Vida Mediterráneo': [
-        const Color(0xFF2D5016),
-        const Color(0xFF4A7C24)
-      ],
-      'Quemador de Grasa Bajo en Carbos': [
-        const Color(0xFF1A3A2A),
-        const Color(0xFF2E6644)
-      ],
-      'Vitalidad Vegana': [
-        const Color(0xFF1A3320), 
-        const Color(0xFF2A5530)
-      ],
-      'Plan de Equilibrio Diabético': [
-        const Color(0xFF1A2A40),
-        const Color(0xFF2A4A6A)
-      ],
+      'Estilo de Vida Mediterráneo': [const Color(0xFF2D5016), const Color(0xFF4A7C24)],
+      'Quemador de Grasa Bajo en Carbos': [const Color(0xFF1A3A2A), const Color(0xFF2E6644)],
+      'Vitalidad Vegana': [const Color(0xFF1A3320), const Color(0xFF2A5530)],
+      'Plan de Equilibrio Diabético': [const Color(0xFF1A2A40), const Color(0xFF2A4A6A)],
     };
 
-    final c = colors[dietName] ??
-        [const Color(0xFF2A2A2A), const Color(0xFF3A3A3A)];
+    final c = colors[dietName] ?? [const Color(0xFF2A2A2A), const Color(0xFF3A3A3A)];
 
     return Container(
       decoration: BoxDecoration(
@@ -401,14 +473,12 @@ class _DietImagePlaceholder extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.restaurant_outlined,
-                color: Colors.white38, size: 48),
+            const Icon(Icons.restaurant_outlined, color: Colors.white38, size: 48),
             const SizedBox(height: 8),
             Text(
               dietName,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  color: Colors.white38, fontSize: 13),
+              style: const TextStyle(color: Colors.white38, fontSize: 13),
             ),
           ],
         ),
@@ -417,7 +487,7 @@ class _DietImagePlaceholder extends StatelessWidget {
   }
 }
 
-// ─── Ilustración del estado vacío (estilo SVG) ────────────────────────────────
+// ─── Ilustración del estado vacío ─────────────────────────────────────────────
 class _EmptyStateIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -434,11 +504,9 @@ class _EmptyPainter extends CustomPainter {
     final cx = size.width / 2;
     final cy = size.height / 2;
 
-    // Fondo círculo/luna
     final bgPaint = Paint()..color = const Color(0xFF2A2A2A);
     canvas.drawCircle(Offset(cx, cy + 10), 40, bgPaint);
 
-    // Cuerpo de la persona
     final bodyPaint = Paint()..color = const Color(0xFF4A4A5A);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -448,19 +516,11 @@ class _EmptyPainter extends CustomPainter {
       bodyPaint,
     );
 
-    // Cabeza de la persona
     canvas.drawCircle(Offset(cx, cy - 16), 12, bodyPaint);
 
-    // Hojas
     final leafPaint = Paint()..color = const Color(0xFF3A3A4A);
-    canvas.drawOval(
-        Rect.fromCenter(
-            center: Offset(cx - 30, cy + 8), width: 16, height: 24),
-        leafPaint);
-    canvas.drawOval(
-        Rect.fromCenter(
-            center: Offset(cx + 30, cy + 8), width: 16, height: 24),
-        leafPaint);
+    canvas.drawOval(Rect.fromCenter(center: Offset(cx - 30, cy + 8), width: 16, height: 24), leafPaint);
+    canvas.drawOval(Rect.fromCenter(center: Offset(cx + 30, cy + 8), width: 16, height: 24), leafPaint);
   }
 
   @override

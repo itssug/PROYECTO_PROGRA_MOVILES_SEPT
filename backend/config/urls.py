@@ -12,4 +12,6 @@ urlpatterns = [
     #chat
     path('api/ai/', include('app.urls')),  # <- esto faltaría
 
+
+    path('api/alimentacion/', include('alimentacion.urls')),
 ]

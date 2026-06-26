@@ -1,9 +1,10 @@
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../services/alimentacion_service.dart';
+import 'create_food_screen.dart';  // ← NUEVO
 
-import 'package:frontend/services/alimentacion_service.dart';
-
-// ─── Colores ──────────────────────────────────────────────────────────────────
+// ─── Colores ──────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
 const _card = Color(0xFF1A1A1A);
 const _orange = Color(0xFFFF5500);
@@ -12,10 +13,7 @@ const _yellow = Color(0xFFFDE68A);
 const _redOrange = Color(0xFFFCA5A5);
 const _textSub = Color(0xFF9CA3AF);
 
-// Token de prueba — en producción obtener del sistema de auth (SharedPreferences / Provider)
-const _demoToken = 'd43af4dada88bc80639484957f30d603079b5b55395d556d210a5837779a49d5';
-
-// ─── Etiquetas para Tipo de Comida ────────────────────────────────────────────
+// ─── Etiquetas para Tipo de Comida ────────────────────────────
 const _tipoComidaOptions = [
   ('desayuno', 'Desayuno'),
   ('media_manana', 'Media Mañana'),
@@ -34,8 +32,6 @@ const _tipoComidaIcons = {
   'snack': Icons.cookie_rounded,
 };
 
-/// Pantalla principal de registro y visualización de alimentos consumidos.
-/// Se conecta al backend Django mediante [AlimentacionService].
 class FoodLogScreen extends StatefulWidget {
   const FoodLogScreen({super.key});
 
@@ -44,8 +40,6 @@ class FoodLogScreen extends StatefulWidget {
 }
 
 class _FoodLogScreenState extends State<FoodLogScreen> {
-  late final AlimentacionService _service;
-
   List<RegistroComidaApi> _registros = [];
   ResumenDiario? _resumen;
   bool _loading = true;
@@ -59,7 +53,6 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
   @override
   void initState() {
     super.initState();
-    _service = AlimentacionService(token: _demoToken);
     _loadData();
   }
 
@@ -72,8 +65,8 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     });
     try {
       final results = await Future.wait([
-        _service.getRegistrosDia(fecha: _fechaStr),
-        _service.getResumenDia(fecha: _fechaStr),
+        AlimentacionService.getRegistrosDia(fecha: _fechaStr),
+        AlimentacionService.getResumenDia(fecha: _fechaStr),
       ]);
       setState(() {
         _registros = results[0] as List<RegistroComidaApi>;
@@ -137,7 +130,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
 
   Future<void> _eliminarRegistro(RegistroComidaApi r) async {
     try {
-      await _service.eliminarRegistro(r.id);
+      await AlimentacionService.eliminarRegistro(r.id);
       _loadData();
     } on AlimentacionException catch (e) {
       _showSnack(e.message, isError: true);
@@ -155,7 +148,6 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Navegación entre Fechas ─────────────────────────────────────────────────
   void _prevDay() {
     setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1)));
     _loadData();
@@ -180,9 +172,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
             _buildDateSelector(),
             Expanded(
               child: _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: _orange),
-                    )
+                  ? const Center(child: CircularProgressIndicator(color: _orange))
                   : _error != null
                       ? _buildError()
                       : _buildContent(),
@@ -203,7 +193,6 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Cabecera (Header) ───────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -226,8 +215,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
               height: 40,
               decoration: BoxDecoration(
                   color: _card, borderRadius: BorderRadius.circular(12)),
-              child: const Icon(Icons.refresh_rounded,
-                  color: Colors.white, size: 20),
+              child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
             ),
           ),
         ],
@@ -235,15 +223,12 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Selector de Fecha ───────────────────────────────────────────────────────
   Widget _buildDateSelector() {
     final hoy = DateTime.now();
     final esHoy = _selectedDate.year == hoy.year &&
         _selectedDate.month == hoy.month &&
         _selectedDate.day == hoy.day;
-    final label = esHoy
-        ? 'Hoy'
-        : DateFormat('d MMM yyyy', 'es').format(_selectedDate);
+    final label = esHoy ? 'Hoy' : DateFormat('d MMM yyyy').format(_selectedDate);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -252,28 +237,18 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
           _iconBtn(Icons.chevron_left_rounded, _prevDay),
           Expanded(
             child: Center(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
+              child: Text(label,
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
             ),
           ),
-          _iconBtn(
-            Icons.chevron_right_rounded,
-            esHoy ? null : _nextDay,
-            disabled: esHoy,
-          ),
+          _iconBtn(Icons.chevron_right_rounded, esHoy ? null : _nextDay, disabled: esHoy),
         ],
       ),
     );
   }
 
-  Widget _iconBtn(IconData icon, VoidCallback? onTap,
-      {bool disabled = false}) {
+  Widget _iconBtn(IconData icon, VoidCallback? onTap, {bool disabled = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -282,13 +257,11 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
         decoration: BoxDecoration(
             color: disabled ? _card.withOpacity(0.4) : _card,
             borderRadius: BorderRadius.circular(10)),
-        child: Icon(icon,
-            color: disabled ? Colors.white24 : Colors.white, size: 20),
+        child: Icon(icon, color: disabled ? Colors.white24 : Colors.white, size: 20),
       ),
     );
   }
 
-  // ── Vista de Error ──────────────────────────────────────────────────────────
   Widget _buildError() {
     return Center(
       child: Padding(
@@ -296,27 +269,19 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.wifi_off_rounded,
-                color: Colors.white24, size: 56),
+            const Icon(Icons.wifi_off_rounded, color: Colors.white24, size: 56),
             const SizedBox(height: 16),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: _textSub, fontSize: 14),
-            ),
+            Text(_error!, textAlign: TextAlign.center,
+                style: const TextStyle(color: _textSub, fontSize: 14)),
             const SizedBox(height: 24),
             GestureDetector(
               onTap: _loadData,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: BoxDecoration(
-                    color: _orange,
-                    borderRadius: BorderRadius.circular(30)),
+                    color: _orange, borderRadius: BorderRadius.circular(30)),
                 child: const Text('Reintentar',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold)),
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -325,7 +290,6 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Contenido Principal ─────────────────────────────────────────────────────
   Widget _buildContent() {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
@@ -341,7 +305,6 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  // ── Tarjeta de Resumen del Día ──────────────────────────────────────────────
   Widget _buildResumenCard(ResumenDiario r) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -357,31 +320,21 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
             children: [
               const Icon(Icons.today_rounded, color: _orange, size: 18),
               const SizedBox(width: 8),
-              const Text(
-                'Resumen del día',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15),
-              ),
+              const Text('Resumen del día',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
               const Spacer(),
-              Text(
-                '${r.cantidadRegistros} alimentos',
-                style: const TextStyle(color: _textSub, fontSize: 12),
-              ),
+              Text('${r.cantidadRegistros} alimentos',
+                  style: const TextStyle(color: _textSub, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              _resumenItem('Calorías',
-                  '${r.totalCalorias.toStringAsFixed(0)} kcal', _orange),
-              _resumenItem('Carbos',
-                  '${r.totalCarbohidratos.toStringAsFixed(1)} g', _yellow, alert: r.totalCarbohidratos > _limiteCarbos),
-              _resumenItem('Azúcares',
-                  '${r.totalAzucares.toStringAsFixed(1)} g', _redOrange, alert: r.totalAzucares > _limiteAzucares),
-              _resumenItem('Carga GL',
-                  r.totalCargaGlucemica.toStringAsFixed(1), _green),
+              _resumenItem('Calorías', '${r.totalCalorias.toStringAsFixed(0)} kcal', _orange),
+              _resumenItem('Carbos', '${r.totalCarbohidratos.toStringAsFixed(1)} g', _yellow),
+              _resumenItem('Azúcares', '${r.totalAzucares.toStringAsFixed(1)} g', _redOrange),
+              _resumenItem('Carga GL', r.totalCargaGlucemica.toStringAsFixed(1), _green),
             ],
           ),
         ],
@@ -394,39 +347,23 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     return Expanded(
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (alert) const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 12),
-              if (alert) const SizedBox(width: 4),
-              Text(value,
-                  style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13)),
-            ],
-          ),
+          Text(value,
+              style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(color: alert ? Colors.redAccent.withOpacity(0.8) : _textSub, fontSize: 10)),
+          Text(label, style: const TextStyle(color: _textSub, fontSize: 10)),
         ],
       ),
     );
   }
 
-  // ── Lista de Registros Agrupados por Tipo ───────────────────────────────────
   Widget _buildRegistrosPorTipo() {
-    if (_registros.isEmpty) {
-      return _buildEmptyState();
-    }
+    if (_registros.isEmpty) return _buildEmptyState();
 
-    // Agrupa por tipo_comida
     final grupos = <String, List<RegistroComidaApi>>{};
     for (final r in _registros) {
       grupos.putIfAbsent(r.tipoComida, () => []).add(r);
     }
 
-    // Muestra en orden
     final widgets = <Widget>[];
     for (final (tipo, _) in _tipoComidaOptions) {
       if (grupos.containsKey(tipo)) {
@@ -435,8 +372,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
       }
     }
 
-    return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
   }
 
   Widget _buildEmptyState() {
@@ -447,10 +383,8 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
           Container(
             width: 80,
             height: 80,
-            decoration: const BoxDecoration(
-                color: _card, shape: BoxShape.circle),
-            child: const Icon(Icons.no_food_rounded,
-                color: Colors.white24, size: 36),
+            decoration: const BoxDecoration(color: _card, shape: BoxShape.circle),
+            child: const Icon(Icons.no_food_rounded, color: Colors.white24, size: 36),
           ),
           const SizedBox(height: 16),
           const Text('No hay registros para este día.',
@@ -463,28 +397,22 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  Widget _buildGrupoComida(
-      String tipo, List<RegistroComidaApi> registros) {
+  Widget _buildGrupoComida(String tipo, List<RegistroComidaApi> registros) {
     final label = _tipoComidaOptions
-        .firstWhere((t) => t.$1 == tipo,
-            orElse: () => (tipo, tipo))
+        .firstWhere((t) => t.$1 == tipo, orElse: () => (tipo, tipo))
         .$2;
     final icon = _tipoComidaIcons[tipo] ?? Icons.restaurant_rounded;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(icon, color: _orange, size: 16),
-            const SizedBox(width: 6),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15)),
-          ],
-        ),
+        Row(children: [
+          Icon(icon, color: _orange, size: 16),
+          const SizedBox(width: 6),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+        ]),
         const SizedBox(height: 8),
         ...registros.map((r) => _buildRegistroItem(r)),
       ],
@@ -503,27 +431,22 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
           color: Colors.red.withOpacity(0.2),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Icon(Icons.delete_outline_rounded,
-            color: Colors.redAccent),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
       ),
       onDismissed: (_) => _eliminarRegistro(r),
-      child: Container(
+      child: GestureDetector(
+        onTap: () => _openEditSheet(r),
+        child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _card,
-          borderRadius: BorderRadius.circular(14),
-        ),
+        decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(14)),
         child: Row(
           children: [
             Container(
               width: 42,
               height: 42,
-              decoration: BoxDecoration(
-                  color: _bg,
-                  borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.restaurant_menu_rounded,
-                  color: _orange, size: 20),
+              decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(10)),
+              child: const Icon(Icons.restaurant_menu_rounded, color: _orange, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -532,13 +455,10 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
                 children: [
                   Text(r.comidaNombre,
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14)),
+                          color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
                   Text(
-                    '${r.cantidad.toStringAsFixed(0)} ${r.unidad}  ·  ${r.hora.substring(0, 5)}',
-                    style:
-                        const TextStyle(color: _textSub, fontSize: 12),
+                    '${r.cantidad.toStringAsFixed(0)} ${r.unidad}  ·  ${r.hora.length >= 5 ? r.hora.substring(0, 5) : r.hora}',
+                    style: const TextStyle(color: _textSub, fontSize: 12),
                   ),
                 ],
               ),
@@ -546,33 +466,50 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  '${(r.caloriasCalculadas ?? 0).toStringAsFixed(0)} kcal',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13),
-                ),
-                Text(
-                  'C: ${(r.carbohidratosCalculados ?? 0).toStringAsFixed(1)}g',
-                  style: const TextStyle(color: _textSub, fontSize: 11),
-                ),
+                Text('${(r.caloriasCalculadas ?? 0).toStringAsFixed(0)} kcal',
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                Text('C: ${(r.carbohidratosCalculados ?? 0).toStringAsFixed(1)}g',
+                    style: const TextStyle(color: _textSub, fontSize: 11)),
               ],
             ),
+            const SizedBox(width: 8),
+            const Icon(Icons.edit_outlined, color: _textSub, size: 16),
           ],
         ),
+      ),
       ),
     );
   }
 
-  // ── Hoja Inferior (Bottom Sheet): Registrar Alimento ────────────────────────
+  // ── NUEVO: Abrir sheet de edición ────────────────────────
+  void _openEditSheet(RegistroComidaApi registro) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditFoodSheet(
+        registro: registro,
+        onSaved: () {
+          Navigator.pop(context);
+          _loadData();
+          _showSnack('Registro actualizado.');
+        },
+        onDeleted: () {
+          Navigator.pop(context);
+          _loadData();
+          _showSnack('Registro eliminado.');
+        },
+      ),
+    );
+  }
+
   void _openAddFoodSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _AddFoodSheet(
-        service: _service,
         selectedDate: _fechaStr,
         onSaved: () {
           Navigator.pop(context);
@@ -584,18 +521,13 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
   }
 }
 
-// ─── Hoja para Registrar Alimento (AddFoodSheet) ──────────────────────────────
+// ─── Bottom Sheet para Registrar Alimento ─────────────────────
 
 class _AddFoodSheet extends StatefulWidget {
-  final AlimentacionService service;
   final String selectedDate;
   final VoidCallback onSaved;
 
-  const _AddFoodSheet({
-    required this.service,
-    required this.selectedDate,
-    required this.onSaved,
-  });
+  const _AddFoodSheet({required this.selectedDate, required this.onSaved});
 
   @override
   State<_AddFoodSheet> createState() => _AddFoodSheetState();
@@ -610,20 +542,21 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
   String _tipoComida = 'almuerzo';
   bool _searching = false;
   bool _saving = false;
+  bool _hasBuscado = false;  // ← NUEVO: saber si ya buscó al menos una vez
 
   TimeOfDay _hora = TimeOfDay.now();
 
   Future<void> _buscar(String q) async {
     if (q.length < 2) {
-      setState(() => _resultados = []);
+      setState(() { _resultados = []; _hasBuscado = false; });
       return;
     }
     setState(() => _searching = true);
     try {
-      final r = await widget.service.buscarAlimentos(q);
-      setState(() => _resultados = r);
+      final r = await AlimentacionService.buscarAlimentos(q);
+      setState(() { _resultados = r; _hasBuscado = true; });
     } catch (_) {
-      setState(() => _resultados = []);
+      setState(() { _resultados = []; _hasBuscado = true; });
     } finally {
       setState(() => _searching = false);
     }
@@ -643,7 +576,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
     try {
       final horaStr =
           '${_hora.hour.toString().padLeft(2, '0')}:${_hora.minute.toString().padLeft(2, '0')}:00';
-      await widget.service.registrarComida(
+      await AlimentacionService.registrarComida(
         comidaId: _selected!.id,
         cantidad: cant,
         tipoComida: _tipoComida,
@@ -653,10 +586,21 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
       );
       widget.onSaved();
     } on AlimentacionException catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       setState(() => _saving = false);
+    }
+  }
+
+  // ── NUEVO: Navegar a crear alimento personalizado ──
+  void _irACrearAlimento() async {
+    final resultado = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CreateFoodScreen()),
+    );
+    if (resultado == true && _searchCtrl.text.length >= 2) {
+      // Si se creó un alimento, refrescar la búsqueda
+      _buscar(_searchCtrl.text);
     }
   }
 
@@ -674,37 +618,33 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Indicador de arrastre (Drag handle)
+            // Drag handle
             Center(
               child: Container(
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2)),
+                    color: Colors.white24, borderRadius: BorderRadius.circular(2)),
               ),
             ),
             const SizedBox(height: 16),
             const Text('Registrar Alimento',
                 style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold)),
+                    color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
 
-            // ── Búsqueda ──────────────────────────────────────────────────────
+            // ── Búsqueda ──────────────────────────────────────
             _label('Buscar alimento'),
             const SizedBox(height: 6),
             TextField(
               controller: _searchCtrl,
               style: const TextStyle(color: Colors.white),
-              decoration: _inputDeco('Ej: avena, pollo, arroz…',
+              decoration: _inputDeco('Ej: avena, pollo, quinua…',
                   suffix: _searching
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(
-                              color: _orange, strokeWidth: 2))
+                          child: CircularProgressIndicator(color: _orange, strokeWidth: 2))
                       : null),
               onChanged: _buscar,
             ),
@@ -713,13 +653,13 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
             if (_resultados.isNotEmpty && _selected == null) ...[
               const SizedBox(height: 8),
               Container(
+                constraints: const BoxConstraints(maxHeight: 200),
                 decoration: BoxDecoration(
                   color: _bg,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: ListView.separated(
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: _resultados.length,
                   separatorBuilder: (_, __) =>
                       const Divider(color: Colors.white12, height: 1),
@@ -730,19 +670,73 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                         setState(() {
                           _selected = c;
                           _searchCtrl.text = c.nombre;
+                          _cantidadCtrl.text = c.porcionTipica.toStringAsFixed(0);
                           _resultados = [];
                         });
                       },
                       title: Text(c.nombre,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 14)),
+                          style: const TextStyle(color: Colors.white, fontSize: 14)),
                       subtitle: Text(
                           '${c.calorias?.toStringAsFixed(0) ?? '--'} kcal · ${c.porcionTipica.toStringAsFixed(0)} ${c.unidadMedida}',
-                          style: const TextStyle(
-                              color: _textSub, fontSize: 12)),
+                          style: const TextStyle(color: _textSub, fontSize: 12)),
                       trailing: _igChip(c.indiceGlucemico),
                     );
                   },
+                ),
+              ),
+            ],
+
+            // ── NUEVO: Sin resultados → ofrecer crear alimento ──
+            if (_resultados.isEmpty &&
+                _hasBuscado &&
+                !_searching &&
+                _selected == null) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _bg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _orange.withOpacity(0.2)),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.search_off_rounded, color: _textSub, size: 28),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No se encontró "${_searchCtrl.text}"',
+                      style: const TextStyle(color: _textSub, fontSize: 13),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: _irACrearAlimento,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: _orange.withOpacity(0.4)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded, color: _orange, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'Crear alimento personalizado',
+                              style: TextStyle(
+                                color: _orange,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -759,22 +753,28 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.check_circle_rounded,
-                        color: _orange, size: 18),
+                    const Icon(Icons.check_circle_rounded, color: _orange, size: 18),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(_selected!.nombre,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_selected!.nombre,
+                              style: const TextStyle(
+                                  color: Colors.white, fontWeight: FontWeight.w600)),
+                          Text(
+                              '${_selected!.calorias?.toStringAsFixed(0) ?? '--'} kcal por ${_selected!.porcionTipica.toStringAsFixed(0)} ${_selected!.unidadMedida}',
+                              style: const TextStyle(color: _textSub, fontSize: 11)),
+                        ],
+                      ),
                     ),
                     GestureDetector(
                       onTap: () => setState(() {
                         _selected = null;
                         _searchCtrl.clear();
+                        _hasBuscado = false;
                       }),
-                      child: const Icon(Icons.close_rounded,
-                          color: _textSub, size: 18),
+                      child: const Icon(Icons.close_rounded, color: _textSub, size: 18),
                     ),
                   ],
                 ),
@@ -783,7 +783,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
 
             const SizedBox(height: 16),
 
-            // ── Cantidad ──────────────────────────────────────────────────────
+            // ── Cantidad ──────────────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -794,13 +794,11 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                       const SizedBox(height: 6),
                       TextField(
                         controller: _cantidadCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
                         style: const TextStyle(color: Colors.white),
                         decoration: _inputDeco(
-                          _selected?.porcionTipica
-                                  .toStringAsFixed(0) ??
-                              '100',
+                          _selected?.porcionTipica.toStringAsFixed(0) ?? '100',
                         ),
                       ),
                     ],
@@ -814,8 +812,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                       _label('Unidad'),
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 14),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                         decoration: BoxDecoration(
                           color: _bg,
                           borderRadius: BorderRadius.circular(12),
@@ -833,7 +830,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
 
             const SizedBox(height: 16),
 
-            // ── Tipo de Comida ────────────────────────────────────────────────
+            // ── Tipo de Comida ────────────────────────────────
             _label('Tipo de comida'),
             const SizedBox(height: 8),
             Wrap(
@@ -845,22 +842,18 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                   onTap: () => setState(() => _tipoComida = t.$1),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: active ? _orange : _bg,
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                          color: active ? _orange : Colors.white12),
+                      border: Border.all(color: active ? _orange : Colors.white12),
                     ),
                     child: Text(
                       t.$2,
                       style: TextStyle(
                         color: active ? Colors.white : _textSub,
                         fontSize: 13,
-                        fontWeight: active
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+                        fontWeight: active ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -870,7 +863,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
 
             const SizedBox(height: 16),
 
-            // ── Hora ──────────────────────────────────────────────────────────
+            // ── Hora ──────────────────────────────────────────
             _label('Hora de consumo'),
             const SizedBox(height: 6),
             GestureDetector(
@@ -880,29 +873,24 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                   initialTime: _hora,
                   builder: (ctx, child) => Theme(
                     data: ThemeData.dark().copyWith(
-                        colorScheme: const ColorScheme.dark(
-                            primary: _orange)),
+                        colorScheme: const ColorScheme.dark(primary: _orange)),
                     child: child!,
                   ),
                 );
                 if (picked != null) setState(() => _hora = picked);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 decoration: BoxDecoration(
                   color: _bg,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.access_time_rounded,
-                        color: _orange, size: 18),
+                    const Icon(Icons.access_time_rounded, color: _orange, size: 18),
                     const SizedBox(width: 8),
-                    Text(
-                      _hora.format(context),
-                      style: const TextStyle(color: Colors.white),
-                    ),
+                    Text(_hora.format(context),
+                        style: const TextStyle(color: Colors.white)),
                   ],
                 ),
               ),
@@ -910,7 +898,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
 
             const SizedBox(height: 24),
 
-            // ── Botón Guardar ─────────────────────────────────────────────────
+            // ── Botón Guardar ─────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: GestureDetector(
@@ -919,9 +907,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                   duration: const Duration(milliseconds: 150),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: _selected == null
-                        ? _orange.withOpacity(0.3)
-                        : _orange,
+                    color: _selected == null ? _orange.withOpacity(0.3) : _orange,
                     borderRadius: BorderRadius.circular(40),
                   ),
                   child: Center(
@@ -930,8 +916,7 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
                             width: 22,
                             height: 22,
                             child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2.5),
-                          )
+                                color: Colors.white, strokeWidth: 2.5))
                         : const Text(
                             'Guardar Registro',
                             style: TextStyle(
@@ -949,10 +934,9 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
     );
   }
 
-  // ── Funciones Auxiliares de UI (Helpers) ────────────────────────────────────
+  // ── Helpers de UI ──────────────────────────────────────────
   Widget _label(String text) {
-    return Text(text,
-        style: const TextStyle(color: _textSub, fontSize: 12));
+    return Text(text, style: const TextStyle(color: _textSub, fontSize: 12));
   }
 
   InputDecoration _inputDeco(String hint, {Widget? suffix}) {
@@ -961,31 +945,368 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
       hintStyle: const TextStyle(color: Colors.white38),
       filled: true,
       fillColor: _bg,
-      suffixIcon: suffix != null ? Padding(padding: const EdgeInsets.all(12), child: suffix) : null,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      suffixIcon: suffix != null
+          ? Padding(padding: const EdgeInsets.all(12), child: suffix)
+          : null,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
     );
   }
 
   Widget? _igChip(int? ig) {
-    if (ig == null) return null;
+    if (ig == null || ig == 0) return null;
     Color c;
-    if (ig <= 55) c = _green;
-    else if (ig <= 69) c = _yellow;
-    else c = _redOrange;
+    if (ig <= 55) {
+      c = _green;
+    } else if (ig <= 69) {
+      c = _yellow;
+    } else {
+      c = _redOrange;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+          color: c.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
+      child: Text('IG $ig',
+          style: TextStyle(color: c, fontSize: 11, fontWeight: FontWeight.bold)),
+    );
+  }
+}
+
+// ─── Bottom Sheet para EDITAR un Registro ─────────────────────
+
+class _EditFoodSheet extends StatefulWidget {
+  final RegistroComidaApi registro;
+  final VoidCallback onSaved;
+  final VoidCallback onDeleted;
+
+  const _EditFoodSheet({
+    required this.registro,
+    required this.onSaved,
+    required this.onDeleted,
+  });
+
+  @override
+  State<_EditFoodSheet> createState() => _EditFoodSheetState();
+}
+
+class _EditFoodSheetState extends State<_EditFoodSheet> {
+  late TextEditingController _cantidadCtrl;
+  late String _tipoComida;
+  late TimeOfDay _hora;
+  bool _saving = false;
+  bool _deleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cantidadCtrl = TextEditingController(
+        text: widget.registro.cantidad.toStringAsFixed(0));
+    _tipoComida = widget.registro.tipoComida;
+
+    // Parsear hora del registro ("HH:mm:ss" o "HH:mm")
+    try {
+      final parts = widget.registro.hora.split(':');
+      _hora = TimeOfDay(
+        hour: int.parse(parts[0]),
+        minute: int.parse(parts[1]),
+      );
+    } catch (_) {
+      _hora = TimeOfDay.now();
+    }
+  }
+
+  @override
+  void dispose() {
+    _cantidadCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    final cant = double.tryParse(_cantidadCtrl.text);
+    if (cant == null || cant <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa una cantidad válida.')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final horaStr =
+          '${_hora.hour.toString().padLeft(2, '0')}:${_hora.minute.toString().padLeft(2, '0')}:00';
+      await AlimentacionService.editarRegistro(
+        registroId: widget.registro.id,
+        cantidad: cant,
+        tipoComida: _tipoComida,
+        hora: horaStr,
+      );
+      widget.onSaved();
+    } on AlimentacionException catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _eliminar() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: _card,
+        title: const Text('¿Eliminar registro?',
+            style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: Text(
+          'Se eliminará "${widget.registro.comidaNombre}" de tus registros.',
+          style: const TextStyle(color: _textSub, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar', style: TextStyle(color: _textSub)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    setState(() => _deleting = true);
+    try {
+      await AlimentacionService.eliminarRegistro(widget.registro.id);
+      widget.onDeleted();
+    } on AlimentacionException catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final r = widget.registro;
 
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-          color: c.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(20)),
-      child: Text('IG $ig',
-          style: TextStyle(
-              color: c, fontSize: 11, fontWeight: FontWeight.bold)),
+      padding: EdgeInsets.only(bottom: bottom),
+      decoration: const BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Editar Registro',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+
+            // ── Info del alimento (solo lectura) ──────────────
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _bg,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42, height: 42,
+                    decoration: BoxDecoration(
+                        color: _orange.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.restaurant_menu_rounded,
+                        color: _orange, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(r.comidaNombre,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15)),
+                        Text('${r.comidaCategoria} · ${r.unidad}',
+                            style: const TextStyle(color: _textSub, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Text('${(r.caloriasCalculadas ?? 0).toStringAsFixed(0)} kcal',
+                      style: const TextStyle(color: _orange, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Cantidad ──────────────────────────────────────
+            const Text('Cantidad', style: TextStyle(color: _textSub, fontSize: 12)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _cantidadCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: r.cantidad.toStringAsFixed(0),
+                hintStyle: const TextStyle(color: Colors.white38),
+                suffixText: r.unidad,
+                suffixStyle: const TextStyle(color: _textSub),
+                filled: true,
+                fillColor: _bg,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _orange, width: 1.5)),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Tipo de comida ────────────────────────────────
+            const Text('Tipo de comida', style: TextStyle(color: _textSub, fontSize: 12)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _tipoComidaOptions.map((t) {
+                final active = _tipoComida == t.$1;
+                return GestureDetector(
+                  onTap: () => setState(() => _tipoComida = t.$1),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: active ? _orange : _bg,
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: active ? _orange : Colors.white12),
+                    ),
+                    child: Text(t.$2,
+                        style: TextStyle(
+                          color: active ? Colors.white : _textSub,
+                          fontSize: 13,
+                          fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                        )),
+                  ),
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Hora ──────────────────────────────────────────
+            const Text('Hora', style: TextStyle(color: _textSub, fontSize: 12)),
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: _hora,
+                  builder: (ctx, child) => Theme(
+                    data: ThemeData.dark().copyWith(
+                        colorScheme: const ColorScheme.dark(primary: _orange)),
+                    child: child!,
+                  ),
+                );
+                if (picked != null) setState(() => _hora = picked);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                    color: _bg, borderRadius: BorderRadius.circular(12)),
+                child: Row(children: [
+                  const Icon(Icons.access_time_rounded, color: _orange, size: 18),
+                  const SizedBox(width: 8),
+                  Text(_hora.format(context),
+                      style: const TextStyle(color: Colors.white)),
+                ]),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── Botones ───────────────────────────────────────
+            Row(
+              children: [
+                // Botón eliminar
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _deleting ? null : _eliminar,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: Center(
+                        child: _deleting
+                            ? const SizedBox(width: 20, height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.redAccent, strokeWidth: 2))
+                            : const Text('Eliminar',
+                                style: TextStyle(
+                                    color: Colors.redAccent,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14)),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Botón guardar
+                Expanded(
+                  flex: 2,
+                  child: GestureDetector(
+                    onTap: _saving ? null : _guardar,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: _orange,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Center(
+                        child: _saving
+                            ? const SizedBox(width: 20, height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2))
+                            : const Text('Guardar Cambios',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14)),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
