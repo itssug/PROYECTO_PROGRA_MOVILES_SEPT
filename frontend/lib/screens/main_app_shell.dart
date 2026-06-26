@@ -8,10 +8,18 @@ import 'medicamentos_main_screen.dart';
 import 'alimentacion/alimentacion_main_screen.dart';
 import 'actividad_fisica/actividad_fisica_screen.dart';
 import '../features/estado_sueno/screens/estado_sueno_screen.dart';
+import '../features/ai_module/screens/ai_prediction_screen.dart';
 import 'usuarios/salud.dart';
 import 'usuarios/perfil.dart';
 import '../features/alertas/screens/alertas_screen.dart';
 import '../features/alertas/services/alertas_service.dart'; 
+import 'chat_screen.dart';
+
+import '../services/in_app_alert_service.dart';
+import '../services/medicamento_service.dart';
+import '../services/registro_service.dart';
+import '../models/medicamento_model.dart';
+import '../models/registro_model.dart';
 
 class MainAppShell extends StatefulWidget {
   const MainAppShell({super.key});
@@ -57,14 +65,76 @@ class _MainAppShellState extends State<MainAppShell> {
         }
       }
     } finally {
-      if (mounted) {
-        setState(() => _cargando = false);
+      if (mounted) setState(() => _cargando = false);
+      // Tras cargar perfil, verificar medicamentos pendientes
+      Future.delayed(const Duration(seconds: 3), _verificarMedicamentosPendientes);
+    }
+  }
+
+  Future<void> _verificarMedicamentosPendientes() async {
+    try {
+      final results = await Future.wait([
+        MedicamentoService.listarActivos(),
+        RegistroService.hoy(),
+      ]);
+      final resMeds = results[0] as ServiceResult<List<Medicamento>>;
+      final resRegs = results[1] as ServiceResult<List<RegistroMedicamento>>;
+
+      if (resMeds.success && resRegs.success) {
+        final meds = resMeds.data!;
+        final regs = resRegs.data!;
+        final ahora = TimeOfDay.now();
+        final ahoraMin = ahora.hour * 60 + ahora.minute;
+
+        for (final m in meds) {
+          if (m.horaToma == null) continue;
+          final parts = m.horaToma!.split(':');
+          final medMin = int.parse(parts[0]) * 60 + int.parse(parts[1]);
+          if (medMin <= ahoraMin) {
+            final tomado = regs.any((r) => r.medicamentoId == m.id && r.fueTomado == 1);
+            if (!tomado) {
+              InAppAlertService.show(
+                title: 'Recordatorio de Medicamento',
+                message: 'Es hora de tomar tu medicamento: ${m.nombre}. ¡No lo olvides!',
+                type: AlertType.warning,
+                duration: const Duration(seconds: 10),
+                actionLabel: 'Confirmar',
+                onTap: () {
+                  setState(() => _selectedIndex = 1);
+                },
+              );
+              break;
+            }
+          }
+        }
       }
+    } catch (e) {
+      debugPrint('Error verificando meds: $e');
     }
 }
 
   void _recargarPerfil() {
     _cargarPerfil();
+  }
+
+  void _openAiScreen(BuildContext context) {
+    final userId = AuthService.usuario?['id'] ?? 14;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AiPredictionScreen(
+          userId: userId,
+          contextData: {
+            // Datos conocidos del usuario
+            // En producción vendrán del último registro
+            'glucosa_antes': _perfil?['glucosa_actual'] ?? 126.0,
+            'horas_sueno': 7.0,
+            'estres': 2,
+            'ejercicio': 30.0,
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -99,6 +169,7 @@ class _MainAppShellState extends State<MainAppShell> {
                 const MedicamentosMainScreen(),
                 const AlimentacionMainScreen(),
                 const ActividadFisicaScreen(),
+                const ChatScreen(),
               ],
             ),
       bottomNavigationBar: BottomNavigationBar(
@@ -209,6 +280,16 @@ class _MainAppShellState extends State<MainAppShell> {
                 ),
 
                 const Divider(color: AppColors.border),
+                // ── Motor de IA
+                _buildDrawerItemHighlighted(
+                  icon: Icons.hub_rounded,
+                  text: 'Motor de Predicción IA',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openAiScreen(context);
+                  },
+                ),
+                const Divider(color: AppColors.border),
                 _buildDrawerItem(
                   icon: Icons.mood,
                   text: 'Estado Emocional y Sueño',
@@ -244,6 +325,33 @@ class _MainAppShellState extends State<MainAppShell> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => PerfilScreen(onPerfilActualizado: _recargarPerfil),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.smart_toy_outlined,
+                    color: Colors.orange,
+                  ),
+                  title: const Text(
+                    'Asistente IA',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  trailing: const Icon(
+                    Icons.auto_awesome,
+                    color: Colors.orange,
+                    size: 18,
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatScreen(),
                       ),
                     );
                   },
@@ -294,6 +402,49 @@ class _MainAppShellState extends State<MainAppShell> {
     return ListTile(
       leading: Icon(icon, color: AppColors.textMuted),
       title: Text(text, style: const TextStyle(color: AppColors.textPrim)),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildDrawerItemHighlighted({
+    required IconData icon,
+    required String text,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF8B2500), Color(0xFFE55A00)],
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: Colors.white, size: 18),
+      ),
+      title: Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.textPrim,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.orange.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Text(
+          'IA',
+          style: TextStyle(
+            color: AppColors.orange,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
       onTap: onTap,
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'analysis_screen.dart';
 import 'diets_screen.dart';
+import 'food_log_screen.dart';
 import '../app_colors.dart';
 
 class AlimentacionMainScreen extends StatelessWidget {
@@ -9,7 +10,7 @@ class AlimentacionMainScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: AppColors.bg,
         appBar: AppBar(
@@ -25,6 +26,7 @@ class AlimentacionMainScreen extends StatelessWidget {
             labelColor: AppColors.orange,
             unselectedLabelColor: AppColors.textMuted,
             tabs: [
+              Tab(icon: Icon(Icons.add_circle_outline_rounded), text: 'Registro'),
               Tab(icon: Icon(Icons.show_chart_rounded), text: 'Análisis'),
               Tab(icon: Icon(Icons.restaurant_menu_rounded), text: 'Dietas'),
             ],
@@ -32,6 +34,7 @@ class AlimentacionMainScreen extends StatelessWidget {
         ),
         body: const TabBarView(
           children: [
+            FoodLogScreen(),
             AnalysisScreen(),
             DietsScreen(),
           ],
@@ -40,3 +43,4 @@ class AlimentacionMainScreen extends StatelessWidget {
     );
   }
 }
+

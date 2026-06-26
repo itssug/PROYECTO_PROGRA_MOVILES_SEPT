@@ -14,6 +14,8 @@ void main() async {
   runApp(MyApp(hasSession: hasSession));
 }
 
+final GlobalKey<NavigatorState> globalNavigatorKey = GlobalKey<NavigatorState>();
+
 class MyApp extends StatelessWidget {
   final bool hasSession;
   
@@ -22,6 +24,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: globalNavigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'GlucoWatch',
       theme: ThemeData.dark().copyWith(

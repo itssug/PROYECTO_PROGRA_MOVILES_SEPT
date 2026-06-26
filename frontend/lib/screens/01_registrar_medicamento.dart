@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../models/medicamento_model.dart';
+import '../services/medicamento_service.dart';
 
 class RegistrarMedicamentoScreen extends StatefulWidget {
   const RegistrarMedicamentoScreen({super.key});
@@ -21,15 +23,39 @@ class _RegistrarMedicamentoScreenState
   DateTime? _fechaInicio;
   DateTime? _fechaFin;
   bool _activo = true;
+  bool _guardando = false;
 
-  final _nombreCtrl   = TextEditingController();
-  final _dosisCtrl    = TextEditingController();
-  final _notasCtrl    = TextEditingController();
+  final _nombreCtrl = TextEditingController();
+  final _dosisCtrl  = TextEditingController();
+  final _notasCtrl  = TextEditingController();
 
-  static const _tipos = ['insulina', 'pastilla', 'inyectable', 'liquido', 'otro'];
-  static const _frecuencias = ['diario', 'semanal', 'mensual', 'condicional'];
-  static const _relacionComida = ['antes', 'durante', 'después', 'independiente'];
-  static const _unidades = ['mg', 'ml', 'UI'];
+  // ── Valores exactos de los ENUMs en MySQL ─────────────────────────────────
+  static const _tiposValores = [
+    'biguanida', 'sulfonilurea', 'inhibidor_sglt2',
+    'agonista_glp1', 'inhibidor_dpp4',
+    'insulina_basal', 'insulina_rapida', 'otro',
+  ];
+  static const _tiposLabels = [
+    'Biguanida', 'Sulfonilurea', 'Inhibidor SGLT2',
+    'Agonista GLP-1', 'Inhibidor DPP-4',
+    'Insulina Basal', 'Insulina Rápida', 'Otro',
+  ];
+
+  static const _frecuenciasValores = [
+    'diario', 'cada_8h', 'cada_12h', 'semanal', 'segun_necesidad',
+  ];
+  static const _frecuenciasLabels = [
+    'Diario', 'Cada 8 horas', 'Cada 12 horas', 'Semanal', 'Según necesidad',
+  ];
+
+  static const _relacionComidaValores = [
+    'antes', 'durante', 'despues', 'independiente',
+  ];
+  static const _relacionComidaLabels = [
+    'Antes de comer', 'Durante la comida', 'Después de comer', 'Independiente',
+  ];
+
+  static const _unidades = ['mg', 'mcg', 'UI', 'ml'];
 
   @override
   void dispose() {
@@ -38,6 +64,33 @@ class _RegistrarMedicamentoScreenState
     _notasCtrl.dispose();
     super.dispose();
   }
+
+  // ── Helpers de formato ────────────────────────────────────────────────────
+
+  String? get _horaTomaSring {
+    if (_horaToma == null) return null;
+    final h = _horaToma!.hour.toString().padLeft(2, '0');
+    final m = _horaToma!.minute.toString().padLeft(2, '0');
+    return '$h:$m:00';
+  }
+
+  String? get _fechaInicioString {
+    if (_fechaInicio == null) return null;
+    final y = _fechaInicio!.year;
+    final m = _fechaInicio!.month.toString().padLeft(2, '0');
+    final d = _fechaInicio!.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  String? get _fechaFinString {
+    if (_fechaFin == null) return null;
+    final y = _fechaFin!.year;
+    final m = _fechaFin!.month.toString().padLeft(2, '0');
+    final d = _fechaFin!.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  // ── Pickers ───────────────────────────────────────────────────────────────
 
   Future<void> _pickTime() async {
     final t = await showTimePicker(
@@ -82,19 +135,123 @@ class _RegistrarMedicamentoScreenState
     }
   }
 
+  // ── Guardar ───────────────────────────────────────────────────────────────
+
+  Future<void> _guardar() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_nombreCtrl.text.trim().isEmpty) {
+      _showError('El nombre del medicamento es obligatorio.');
+      return;
+    }
+
+    final medicamento = Medicamento(
+      nombre:         _nombreCtrl.text.trim(),
+      tipo:           _tipoSeleccionado,
+      dosis:          _dosisCtrl.text.trim().isEmpty ? null : _dosisCtrl.text.trim(),
+      unidad:         _unidadSeleccionada,
+      horaToma:       _horaTomaSring,
+      relacionComida: _relacionComidaSeleccionada,
+      frecuencia:     _frecuenciaSeleccionada,
+      fechaInicio:    _fechaInicioString,
+      fechaFin:       _fechaFinString,
+      activo:         _activo ? 1 : 0,
+      notas:          _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
+    );
+
+    setState(() => _guardando = true);
+    final result = await MedicamentoService.crear(medicamento);
+    if (!mounted) return;
+    setState(() => _guardando = false);
+
+    if (result.success) {
+      _showSuccess();
+      // Vuelve al tab de Tratamiento en lugar de hacer pop
+      DefaultTabController.of(context).animateTo(1);
+      _limpiarFormulario(); // limpia el form para la próxima vez
+    } else {
+      _showError(result.error ?? 'No se pudo guardar el medicamento.');
+    }
+  }
+  void _limpiarFormulario() {
+    _nombreCtrl.clear();
+    _dosisCtrl.clear();
+    _notasCtrl.clear();
+    setState(() {
+      _tipoSeleccionado          = null;
+      _frecuenciaSeleccionada    = null;
+      _relacionComidaSeleccionada = null;
+      _unidadSeleccionada        = null;
+      _horaToma                  = null;
+      _fechaInicio               = null;
+      _fechaFin                  = null;
+      _activo                    = true;
+    });
+  }
+  void _showError(String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 10),
+            Expanded(child: Text(mensaje)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  void _showSuccess() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 18),
+            SizedBox(width: 10),
+            Text('Medicamento guardado correctamente.'),
+          ],
+        ),
+        backgroundColor: AppTheme.accent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Nuevo Medicamento'),
         actions: [
-          TextButton(
-            onPressed: () {},
-            child: const Text(
-              'Guardar',
-              style: TextStyle(color: AppTheme.accent, fontWeight: FontWeight.w600),
-            ),
-          ),
+          _guardando
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.accent,
+                    ),
+                  ),
+                )
+              : TextButton(
+                  onPressed: _guardar,
+                  child: const Text(
+                    'Guardar',
+                    style: TextStyle(
+                        color: AppTheme.accent, fontWeight: FontWeight.w600),
+                  ),
+                ),
         ],
       ),
       body: Form(
@@ -104,10 +261,11 @@ class _RegistrarMedicamentoScreenState
           children: [
             // ── Hero info card
             _HeroInputCard(
-              nombreCtrl: _nombreCtrl,
+              nombreCtrl:       _nombreCtrl,
               tipoSeleccionado: _tipoSeleccionado,
-              tipos: _tipos,
-              onTipoChanged: (v) => setState(() => _tipoSeleccionado = v),
+              tiposValores:     _tiposValores,
+              tiposLabels:      _tiposLabels,
+              onTipoChanged:    (v) => setState(() => _tipoSeleccionado = v),
             ),
             const SizedBox(height: 20),
 
@@ -135,9 +293,10 @@ class _RegistrarMedicamentoScreenState
                         child: _FieldItem(
                           label: 'Unidad',
                           child: _DropdownField(
-                            hint: 'mg',
-                            value: _unidadSeleccionada,
-                            items: _unidades,
+                            hint:      'mg',
+                            value:     _unidadSeleccionada,
+                            valores:   _unidades,
+                            labels:    _unidades, // unidad no necesita label distinto
                             onChanged: (v) => setState(() => _unidadSeleccionada = v),
                           ),
                         ),
@@ -150,9 +309,10 @@ class _RegistrarMedicamentoScreenState
                   _FieldItem(
                     label: 'Frecuencia',
                     child: _DropdownField(
-                      hint: 'Seleccionar frecuencia',
-                      value: _frecuenciaSeleccionada,
-                      items: _frecuencias,
+                      hint:      'Seleccionar frecuencia',
+                      value:     _frecuenciaSeleccionada,
+                      valores:   _frecuenciasValores,
+                      labels:    _frecuenciasLabels,
                       onChanged: (v) => setState(() => _frecuenciaSeleccionada = v),
                     ),
                   ),
@@ -167,21 +327,22 @@ class _RegistrarMedicamentoScreenState
               child: Column(
                 children: [
                   _TapField(
-                    label: 'Hora de toma',
-                    value: _horaToma != null
+                    label:    'Hora de toma',
+                    value:    _horaToma != null
                         ? _horaToma!.format(context)
                         : 'Seleccionar hora',
-                    icon: Icons.access_time_rounded,
-                    onTap: _pickTime,
+                    icon:     Icons.access_time_rounded,
+                    onTap:    _pickTime,
                     hasValue: _horaToma != null,
                   ),
                   _Divider(),
                   _FieldItem(
                     label: 'Relación con comida',
                     child: _DropdownField(
-                      hint: 'Cuándo tomarlo',
-                      value: _relacionComidaSeleccionada,
-                      items: _relacionComida,
+                      hint:      'Cuándo tomarlo',
+                      value:     _relacionComidaSeleccionada,
+                      valores:   _relacionComidaValores,
+                      labels:    _relacionComidaLabels,
                       onChanged: (v) => setState(() => _relacionComidaSeleccionada = v),
                     ),
                   ),
@@ -200,8 +361,8 @@ class _RegistrarMedicamentoScreenState
                     value: _fechaInicio != null
                         ? '${_fechaInicio!.day}/${_fechaInicio!.month}/${_fechaInicio!.year}'
                         : 'Seleccionar fecha',
-                    icon: Icons.calendar_today_rounded,
-                    onTap: () => _pickDate(isStart: true),
+                    icon:     Icons.calendar_today_rounded,
+                    onTap:    () => _pickDate(isStart: true),
                     hasValue: _fechaInicio != null,
                   ),
                   _Divider(),
@@ -210,8 +371,8 @@ class _RegistrarMedicamentoScreenState
                     value: _fechaFin != null
                         ? '${_fechaFin!.day}/${_fechaFin!.month}/${_fechaFin!.year}'
                         : 'Sin fecha de fin',
-                    icon: Icons.event_rounded,
-                    onTap: () => _pickDate(isStart: false),
+                    icon:     Icons.event_rounded,
+                    onTap:    () => _pickDate(isStart: false),
                     hasValue: _fechaFin != null,
                   ),
                   _Divider(),
@@ -223,9 +384,9 @@ class _RegistrarMedicamentoScreenState
                         style: TextStyle(color: AppTheme.textPrimary, fontSize: 14),
                       ),
                       Switch(
-                        value: _activo,
-                        onChanged: (v) => setState(() => _activo = v),
-                        activeColor: AppTheme.accent,
+                        value:              _activo,
+                        onChanged:          (v) => setState(() => _activo = v),
+                        activeColor:        AppTheme.accent,
                         inactiveThumbColor: AppTheme.textMuted,
                         inactiveTrackColor: AppTheme.surfaceLight,
                       ),
@@ -241,16 +402,16 @@ class _RegistrarMedicamentoScreenState
             AppCard(
               child: TextFormField(
                 controller: _notasCtrl,
-                maxLines: 3,
+                maxLines:   3,
                 style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
                 decoration: const InputDecoration(
-                  hintText: 'Instrucciones adicionales del médico...',
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  fillColor: Colors.transparent,
-                  filled: false,
-                  isDense: true,
+                  hintText:       'Instrucciones adicionales del médico...',
+                  border:         InputBorder.none,
+                  enabledBorder:  InputBorder.none,
+                  focusedBorder:  InputBorder.none,
+                  fillColor:      Colors.transparent,
+                  filled:         false,
+                  isDense:        true,
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -260,9 +421,18 @@ class _RegistrarMedicamentoScreenState
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add_rounded, size: 20),
-                label: const Text('Agregar al Plan de Tratamiento'),
+                onPressed: _guardando ? null : _guardar,
+                icon: _guardando
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.add_rounded, size: 20),
+                label: Text(_guardando
+                    ? 'Guardando...'
+                    : 'Agregar al Plan de Tratamiento'),
               ),
             ),
           ],
@@ -272,18 +442,20 @@ class _RegistrarMedicamentoScreenState
   }
 }
 
-// ── Widgets internos de la pantalla ──────────────────────────────────────────
+// ── Widgets internos ──────────────────────────────────────────────────────────
 
 class _HeroInputCard extends StatelessWidget {
   final TextEditingController nombreCtrl;
   final String? tipoSeleccionado;
-  final List<String> tipos;
+  final List<String> tiposValores;
+  final List<String> tiposLabels;
   final ValueChanged<String?> onTipoChanged;
 
   const _HeroInputCard({
     required this.nombreCtrl,
     required this.tipoSeleccionado,
-    required this.tipos,
+    required this.tiposValores,
+    required this.tiposLabels,
     required this.onTipoChanged,
   });
 
@@ -322,12 +494,15 @@ class _HeroInputCard extends StatelessWidget {
                   children: [
                     Text('Medicamento',
                         style: TextStyle(
-                            color: AppTheme.textSecondary, fontSize: 11,
-                            fontWeight: FontWeight.w500, letterSpacing: 0.8)),
+                            color: AppTheme.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.8)),
                     SizedBox(height: 2),
                     Text('Información básica',
                         style: TextStyle(
-                            color: AppTheme.textPrimary, fontSize: 15,
+                            color: AppTheme.textPrimary,
+                            fontSize: 15,
                             fontWeight: FontWeight.w600)),
                   ],
                 ),
@@ -338,21 +513,28 @@ class _HeroInputCard extends StatelessWidget {
           TextFormField(
             controller: nombreCtrl,
             style: const TextStyle(
-                color: AppTheme.textPrimary, fontSize: 16, fontWeight: FontWeight.w500),
+                color: AppTheme.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w500),
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Campo obligatorio' : null,
             decoration: const InputDecoration(
               hintText: 'Nombre del medicamento',
-              prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 20),
+              prefixIcon:
+                  Icon(Icons.search_rounded, color: AppTheme.textMuted, size: 20),
             ),
           ),
           const SizedBox(height: 14),
-          // Chips de tipo
+          // Chips de tipo — valor interno vs label visible
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: tipos.map((t) {
-              final selected = t == tipoSeleccionado;
+            children: List.generate(tiposValores.length, (i) {
+              final valor    = tiposValores[i];
+              final label    = tiposLabels[i];
+              final selected = valor == tipoSeleccionado;
               return GestureDetector(
-                onTap: () => onTipoChanged(t),
+                onTap: () => onTipoChanged(valor),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -364,16 +546,16 @@ class _HeroInputCard extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    t[0].toUpperCase() + t.substring(1),
+                    label,
                     style: TextStyle(
-                      color: selected ? Colors.white : AppTheme.textSecondary,
-                      fontSize: 13,
+                      color:      selected ? Colors.white : AppTheme.textSecondary,
+                      fontSize:   13,
                       fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ),
         ],
       ),
@@ -388,41 +570,52 @@ class _FieldItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label,
-          style: const TextStyle(
-              color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
-      const SizedBox(height: 8),
-      child,
-    ],
-  );
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 8),
+          child,
+        ],
+      );
 }
 
+/// Dropdown que separa el valor que se envía al backend del label que ve el usuario.
 class _DropdownField extends StatelessWidget {
   final String hint;
   final String? value;
-  final List<String> items;
+  final List<String> valores; // lo que se envía al backend (ENUM exacto)
+  final List<String> labels;  // lo que ve el usuario
   final ValueChanged<String?> onChanged;
-  const _DropdownField(
-      {required this.hint, required this.value, required this.items, required this.onChanged});
+
+  const _DropdownField({
+    required this.hint,
+    required this.value,
+    required this.valores,
+    required this.labels,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: value,
-      hint: Text(hint,
+      value:         value,
+      hint:          Text(hint,
           style: const TextStyle(color: AppTheme.textMuted, fontSize: 14)),
       dropdownColor: AppTheme.surfaceLight,
       icon: const Icon(Icons.expand_more_rounded, color: AppTheme.textMuted),
       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
       decoration: const InputDecoration(),
-      items: items
-          .map((i) => DropdownMenuItem(
-                value: i,
-                child: Text(i[0].toUpperCase() + i.substring(1)),
-              ))
-          .toList(),
+      items: List.generate(
+        valores.length,
+        (i) => DropdownMenuItem(
+          value: valores[i],
+          child: Text(labels[i]),
+        ),
+      ),
       onChanged: onChanged,
     );
   }
@@ -434,24 +627,26 @@ class _TapField extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool hasValue;
-  const _TapField(
-      {required this.label,
-      required this.value,
-      required this.icon,
-      required this.onTap,
-      required this.hasValue});
+
+  const _TapField({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onTap,
+    required this.hasValue,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap:    onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
           children: [
             Icon(icon,
-                size: 18,
+                size:  18,
                 color: hasValue ? AppTheme.accent : AppTheme.textMuted),
             const SizedBox(width: 12),
             Expanded(
@@ -460,14 +655,14 @@ class _TapField extends StatelessWidget {
                 children: [
                   Text(label,
                       style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 11,
+                          color:      AppTheme.textSecondary,
+                          fontSize:   11,
                           fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
                   Text(value,
                       style: TextStyle(
-                        color: hasValue ? AppTheme.textPrimary : AppTheme.textMuted,
-                        fontSize: 14,
+                        color:      hasValue ? AppTheme.textPrimary : AppTheme.textMuted,
+                        fontSize:   14,
                         fontWeight: hasValue ? FontWeight.w500 : FontWeight.w400,
                       )),
                 ],

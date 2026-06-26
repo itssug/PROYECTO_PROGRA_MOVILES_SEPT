@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/theme.dart';
+import '../models/medicamento_model.dart';
+import '../services/registro_service.dart';
 
 class ConfirmarTomaScreen extends StatefulWidget {
-  const ConfirmarTomaScreen({super.key});
+  // Recibe el medicamento desde la pantalla 03
+  // Si es null muestra un selector (acceso directo desde el nav)
+  final Medicamento? medicamento;
+  const ConfirmarTomaScreen({super.key, this.medicamento});
 
   @override
   State<ConfirmarTomaScreen> createState() => _ConfirmarTomaScreenState();
@@ -10,8 +16,10 @@ class ConfirmarTomaScreen extends StatefulWidget {
 
 class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
     with SingleTickerProviderStateMixin {
+
   bool? _fueTomado;
-  final _dosisCtrl = TextEditingController(text: '5');
+  bool _guardando = false;
+  late TextEditingController _dosisCtrl;
   final _notasCtrl = TextEditingController();
   late AnimationController _checkAnim;
   late Animation<double> _scaleAnim;
@@ -20,6 +28,10 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
   @override
   void initState() {
     super.initState();
+    // Pre-rellena la dosis con la del medicamento si viene
+    _dosisCtrl = TextEditingController(
+      text: widget.medicamento?.dosis ?? '',
+    );
     _checkAnim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -37,11 +49,7 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
 
   void _seleccionar(bool tomado) {
     setState(() => _fueTomado = tomado);
-    if (tomado) {
-      _checkAnim.forward(from: 0);
-    } else {
-      _checkAnim.reverse();
-    }
+    tomado ? _checkAnim.forward(from: 0) : _checkAnim.reverse();
   }
 
   Future<void> _pickTime() async {
@@ -61,6 +69,56 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
     if (t != null) setState(() => _horaConfirmada = t);
   }
 
+  Future<void> _guardar() async {
+    if (_fueTomado == null || widget.medicamento?.id == null) return;
+    HapticFeedback.mediumImpact();
+
+    setState(() => _guardando = true);
+
+    final hora = '${_horaConfirmada.hour.toString().padLeft(2,'0')}:'
+                 '${_horaConfirmada.minute.toString().padLeft(2,'0')}:00';
+
+    final result = await RegistroService.confirmarToma(
+      medicamentoId: widget.medicamento!.id!,
+      fueTomado:     _fueTomado!,
+      dosisTomada:   double.tryParse(_dosisCtrl.text),
+      notas:         _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
+    );
+
+    if (!mounted) return;
+    setState(() => _guardando = false);
+
+    if (result.success) {
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_fueTomado!
+              ? '✓ Toma registrada correctamente'
+              : 'Omisión registrada'),
+          backgroundColor: _fueTomado! ? AppTheme.success : AppTheme.danger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        ),
+      );
+      // Vuelve atrás si vino navegado, o resetea si es tab directo
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context, true); // true = hubo cambio
+      } else {
+        setState(() { _fueTomado = null; _dosisCtrl.clear(); _notasCtrl.clear(); });
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.error ?? 'Error al guardar'),
+          backgroundColor: AppTheme.danger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -68,9 +126,14 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
         children: [
-          // ── Medicamento info
-          _MedHeader(),
+          // ── Header del medicamento
+          if (widget.medicamento != null)
+            _MedHeader(med: widget.medicamento!)
+          else
+            _SinMedicamentoCard(),
           const SizedBox(height: 24),
+
+          if (widget.medicamento != null) ...[
 
           // ── Pregunta principal
           const SectionLabel('¿Tomaste el medicamento?'),
@@ -99,7 +162,7 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
           ),
           const SizedBox(height: 24),
 
-          // ── Animación de confirmación
+          // ── Feedback visual
           if (_fueTomado == true) ...[
             ScaleTransition(
               scale: _scaleAnim,
@@ -112,8 +175,7 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.check_circle_rounded,
-                        color: AppTheme.success, size: 28),
+                    Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 28),
                     SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -148,14 +210,12 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline_rounded,
-                      color: AppTheme.danger, size: 22),
+                  Icon(Icons.info_outline_rounded, color: AppTheme.danger, size: 22),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Omitir dosis puede afectar tu glucosa. Consulta con tu médico si necesitas ajustes.',
-                      style: TextStyle(
-                          color: AppTheme.textSecondary, fontSize: 12),
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                     ),
                   ),
                 ],
@@ -164,13 +224,13 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
             const SizedBox(height: 20),
           ],
 
-          // ── Detalles del registro (solo si tomado)
+          // ── Detalles (solo si tomado)
           if (_fueTomado == true) ...[
             const SectionLabel('Detalles del registro'),
             AppCard(
               child: Column(
                 children: [
-                  // Hora exacta
+                  // Hora
                   GestureDetector(
                     onTap: _pickTime,
                     behavior: HitTestBehavior.opaque,
@@ -187,8 +247,7 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
                               children: [
                                 const Text('Hora de toma',
                                     style: TextStyle(
-                                        color: AppTheme.textSecondary,
-                                        fontSize: 11)),
+                                        color: AppTheme.textSecondary, fontSize: 11)),
                                 Text(_horaConfirmada.format(context),
                                     style: const TextStyle(
                                         color: AppTheme.textPrimary,
@@ -204,7 +263,7 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
                     ),
                   ),
                   const Divider(color: AppTheme.border, height: 1),
-                  // Dosis tomada
+                  // Dosis
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Row(
@@ -218,12 +277,11 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
                             children: [
                               const Text('Dosis tomada',
                                   style: TextStyle(
-                                      color: AppTheme.textSecondary,
-                                      fontSize: 11)),
+                                      color: AppTheme.textSecondary, fontSize: 11)),
                               Row(
                                 children: [
                                   SizedBox(
-                                    width: 60,
+                                    width: 70,
                                     child: TextFormField(
                                       controller: _dosisCtrl,
                                       keyboardType: TextInputType.number,
@@ -242,23 +300,22 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
                                       ),
                                     ),
                                   ),
-                                  const Text(' mg',
-                                      style: TextStyle(
-                                          color: AppTheme.textSecondary,
-                                          fontSize: 14)),
+                                  Text(' ${widget.medicamento?.unidad ?? 'mg'}',
+                                      style: const TextStyle(
+                                          color: AppTheme.textSecondary, fontSize: 14)),
                                 ],
                               ),
                             ],
                           ),
                         ),
-                        // Botones +/-
                         Row(
                           children: [
                             _StepButton(
                               icon: Icons.remove_rounded,
                               onTap: () {
                                 final v = double.tryParse(_dosisCtrl.text) ?? 0;
-                                if (v > 0) _dosisCtrl.text = '${(v - 1).toStringAsFixed(0)}';
+                                if (v > 0) setState(() =>
+                                    _dosisCtrl.text = '${(v - 1).toStringAsFixed(0)}');
                               },
                             ),
                             const SizedBox(width: 8),
@@ -266,7 +323,8 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
                               icon: Icons.add_rounded,
                               onTap: () {
                                 final v = double.tryParse(_dosisCtrl.text) ?? 0;
-                                _dosisCtrl.text = '${(v + 1).toStringAsFixed(0)}';
+                                setState(() =>
+                                    _dosisCtrl.text = '${(v + 1).toStringAsFixed(0)}');
                               },
                             ),
                           ],
@@ -280,7 +338,7 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
             const SizedBox(height: 16),
           ],
 
-          // ── Notas (siempre visible)
+          // ── Notas
           if (_fueTomado != null) ...[
             const SectionLabel('Notas opcionales'),
             AppCard(
@@ -301,17 +359,23 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
               ),
             ),
           ],
-        ],
+          ], // End of if (widget.medicamento != null) ...[
+        ], // End of ListView children
       ),
-      // ── FAB de guardar
-      floatingActionButton: _fueTomado != null
+      floatingActionButton: _fueTomado != null && widget.medicamento != null
           ? FloatingActionButton.extended(
-              onPressed: () {},
+              onPressed: _guardando ? null : _guardar,
               backgroundColor: _fueTomado! ? AppTheme.success : AppTheme.danger,
-              icon: const Icon(Icons.save_rounded, color: Colors.white),
-              label: const Text('Guardar registro',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600)),
+              icon: _guardando
+                  ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.save_rounded, color: Colors.white),
+              label: Text(
+                _guardando ? 'Guardando...' : 'Guardar registro',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
             )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -319,9 +383,26 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
   }
 }
 
+// ── Widgets ───────────────────────────────────────────────────────────────────
+
 class _MedHeader extends StatelessWidget {
+  final Medicamento med;
+  const _MedHeader({required this.med});
+
+  Color get _color {
+    switch (med.tipo) {
+      case 'insulina':   return const Color(0xFF5E9BFF);
+      case 'inyectable': return const Color(0xFFB06BFF);
+      default:           return AppTheme.accent;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final dosisLabel = med.dosis != null && med.unidad != null
+        ? '${med.dosis} ${med.unidad}'
+        : med.dosis ?? '—';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -332,33 +413,61 @@ class _MedHeader extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 52, height: 52,
             decoration: BoxDecoration(
-              color: AppTheme.accentDim,
+              color: _color.withOpacity(0.15),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.medication_rounded,
-                color: AppTheme.accent, size: 28),
+            child: Icon(Icons.medication_rounded, color: _color, size: 28),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Glibenclamida',
-                    style: TextStyle(
+                Text(med.nombre,
+                    style: const TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.w700)),
-                SizedBox(height: 4),
-                Text('5 mg · Pastilla · Antes del almuerzo',
-                    style: TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 13)),
+                const SizedBox(height: 4),
+                Text(
+                  '$dosisLabel'
+                  '${med.tipo != null ? ' · ${med.tipo}' : ''}'
+                  '${med.relacionComida != null ? ' · ${med.relacionComida}' : ''}',
+                  style: const TextStyle(
+                      color: AppTheme.textSecondary, fontSize: 13),
+                ),
               ],
             ),
           ),
-          const AccentBadge('13:00'),
+          AccentBadge(med.horaFormateada, color: _color),
+        ],
+      ),
+    );
+  }
+}
+
+class _SinMedicamentoCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: AppTheme.textMuted, size: 22),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Selecciona un medicamento desde "Recordatorios" para confirmar una toma.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+          ),
         ],
       ),
     );
@@ -371,13 +480,9 @@ class _OptionButton extends StatelessWidget {
   final bool selected;
   final Color color;
   final VoidCallback onTap;
-
   const _OptionButton({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.color,
-    required this.onTap,
+    required this.label, required this.icon,
+    required this.selected, required this.color, required this.onTap,
   });
 
   @override
@@ -391,9 +496,8 @@ class _OptionButton extends StatelessWidget {
           color: selected ? color.withOpacity(0.12) : AppTheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: selected ? color : AppTheme.border,
-            width: selected ? 1.5 : 1,
-          ),
+              color: selected ? color : AppTheme.border,
+              width: selected ? 1.5 : 1),
         ),
         child: Column(
           children: [
@@ -421,8 +525,7 @@ class _StepButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 32,
-        height: 32,
+        width: 32, height: 32,
         decoration: BoxDecoration(
           color: AppTheme.surfaceLight,
           borderRadius: BorderRadius.circular(8),

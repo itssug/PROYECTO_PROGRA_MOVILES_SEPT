@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:frontend/services/alimentacion_service.dart';
+import 'package:frontend/services/in_app_alert_service.dart';
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
@@ -52,6 +53,10 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
   String? _error;
   DateTime _selectedDate = DateTime.now();
 
+  // Límites recomendados
+  static const double _limiteCarbos = 150.0;
+  static const double _limiteAzucares = 25.0;
+
   @override
   void initState() {
     super.initState();
@@ -61,7 +66,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
 
   String get _fechaStr => DateFormat('yyyy-MM-dd').format(_selectedDate);
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool checkLimits = false}) async {
     setState(() {
       _loading = true;
       _error = null;
@@ -76,6 +81,10 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
         _resumen = results[1] as ResumenDiario;
         _loading = false;
       });
+
+      if (checkLimits && _resumen != null) {
+        _verificarLimites(_resumen!);
+      }
     } on AlimentacionException catch (e) {
       setState(() {
         _error = e.message;
@@ -86,6 +95,28 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
         _error = 'No se pudo conectar al servidor. Verifica que el backend esté activo.';
         _loading = false;
       });
+    }
+  }
+
+  void _verificarLimites(ResumenDiario resumen) {
+    bool excedioCarbos = resumen.totalCarbohidratos > _limiteCarbos;
+    bool excedioAzucares = resumen.totalAzucares > _limiteAzucares;
+
+    if (excedioCarbos || excedioAzucares) {
+      String mensaje = 'Has superado el límite diario:\n';
+      if (excedioCarbos) {
+        mensaje += '• Carbohidratos: ${resumen.totalCarbohidratos.toStringAsFixed(1)}g (Límite: ${_limiteCarbos}g)\n';
+      }
+      if (excedioAzucares) {
+        mensaje += '• Azúcares: ${resumen.totalAzucares.toStringAsFixed(1)}g (Límite: ${_limiteAzucares}g)\n';
+      }
+
+      InAppAlertService.show(
+        title: 'Alerta Nutricional',
+        message: mensaje.trim(),
+        type: AlertType.error,
+        duration: const Duration(seconds: 8),
+      );
     }
   }
 
@@ -145,6 +176,7 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
         onPressed: () => _openAddFoodSheet(),
         backgroundColor: _orange,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
@@ -330,9 +362,9 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
               _resumenItem('Calorías',
                   '${r.totalCalorias.toStringAsFixed(0)} kcal', _orange),
               _resumenItem('Carbos',
-                  '${r.totalCarbohidratos.toStringAsFixed(1)} g', _yellow),
+                  '${r.totalCarbohidratos.toStringAsFixed(1)} g', _yellow, alert: r.totalCarbohidratos > _limiteCarbos),
               _resumenItem('Azúcares',
-                  '${r.totalAzucares.toStringAsFixed(1)} g', _redOrange),
+                  '${r.totalAzucares.toStringAsFixed(1)} g', _redOrange, alert: r.totalAzucares > _limiteAzucares),
               _resumenItem('Carga GL',
                   r.totalCargaGlucemica.toStringAsFixed(1), _green),
             ],
@@ -342,18 +374,26 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  Widget _resumenItem(String label, String value, Color color) {
+  Widget _resumenItem(String label, String value, Color defaultColor, {bool alert = false}) {
+    final color = alert ? Colors.redAccent : defaultColor;
     return Expanded(
       child: Column(
         children: [
-          Text(value,
-              style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (alert) const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 12),
+              if (alert) const SizedBox(width: 4),
+              Text(value,
+                  style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13)),
+            ],
+          ),
           const SizedBox(height: 2),
           Text(label,
-              style: const TextStyle(color: _textSub, fontSize: 10)),
+              style: TextStyle(color: alert ? Colors.redAccent.withOpacity(0.8) : _textSub, fontSize: 10)),
         ],
       ),
     );
@@ -521,8 +561,17 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
         selectedDate: _fechaStr,
         onSaved: () {
           Navigator.pop(context);
-          _loadData();
-          _showSnack('Alimento registrado correctamente.');
+          _loadData(checkLimits: true);
+          
+          // Alerta in-app de recordatorio de glucosa post-prandial
+          Future.delayed(const Duration(milliseconds: 500), () {
+            InAppAlertService.show(
+              title: 'Recordatorio de Glucosa',
+              message: 'Comida registrada. ¡No olvides medir tu glucosa post-prandial en 2 horas!',
+              type: AlertType.info,
+              duration: const Duration(seconds: 6),
+            );
+          });
         },
       ),
     );

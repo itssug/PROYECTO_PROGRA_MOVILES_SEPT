@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../models/medicamento_model.dart';
+import '../models/registro_model.dart';
+import '../services/medicamento_service.dart';
+import '../services/registro_service.dart';
 
 class AnalisisGlucosaScreen extends StatefulWidget {
   const AnalisisGlucosaScreen({super.key});
@@ -13,40 +17,131 @@ class _AnalisisGlucosaScreenState extends State<AnalisisGlucosaScreen> {
   final List<String> _periodos = ['7 días', '14 días', '30 días'];
   String? _medSeleccionado;
 
-  final List<_MedAnalisis> _medicamentos = [
-    _MedAnalisis(
-      nombre: 'Metformina',
-      dosis: '850 mg',
-      reduccionPromedio: -18.4,
-      adherencia: 0.86,
-      color: AppTheme.success,
-      puntos: [145, 132, 128, 119, 122, 115, 118],
-    ),
-    _MedAnalisis(
-      nombre: 'Glibenclamida',
-      dosis: '5 mg',
-      reduccionPromedio: -24.1,
-      adherencia: 0.71,
-      color: AppTheme.accent,
-      puntos: [160, 145, 138, 130, 142, 128, 125],
-    ),
-    _MedAnalisis(
-      nombre: 'Insulina Glargina',
-      dosis: '20 UI',
-      reduccionPromedio: -31.7,
-      adherencia: 0.95,
-      color: const Color(0xFF5E9BFF),
-      puntos: [170, 155, 148, 140, 135, 130, 128],
-    ),
-  ];
+  // ── Estado real ───────────────────────────────────────────────────────────
+  bool _cargando = true;
+  String? _error;
+
+  Adherencia? _adherencia;
+  List<Medicamento> _medicamentosActivos = [];
+  List<RegistroMedicamento> _historial   = [];
+
+  // Datos calculados en cliente por medicamento
+  List<_MedAnalisis> _medAnalisis = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatos();
+  }
+
+  Future<void> _cargarDatos() async {
+    setState(() { _cargando = true; _error = null; });
+
+    // Llamadas en paralelo
+    final results = await Future.wait([
+      RegistroService.adherencia(),
+      MedicamentoService.listarActivos(),
+      RegistroService.historial(),
+    ]);
+
+    if (!mounted) return;
+
+    final resAdherencia = results[0] as ServiceResult<Adherencia>;
+    final resMeds       = results[1] as ServiceResult<List<Medicamento>>;
+    final resHistorial  = results[2] as ServiceResult<List<RegistroMedicamento>>;
+
+    if (!resMeds.success) {
+      setState(() { _error = resMeds.error; _cargando = false; });
+      return;
+    }
+
+    final meds      = resMeds.data ?? [];
+    final historial = resHistorial.data ?? [];
+
+    setState(() {
+      _adherencia          = resAdherencia.data;
+      _medicamentosActivos = meds;
+      _historial           = historial;
+      _medAnalisis         = _calcularAnalisisPorMed(meds, historial);
+      _cargando            = false;
+    });
+  }
+
+  /// Calcula adherencia y reducción simulada por medicamento a partir
+  /// de los registros reales. La reducción de glucosa es simulada
+  /// hasta que el backend exponga un endpoint de glucosa.
+  List<_MedAnalisis> _calcularAnalisisPorMed(
+    List<Medicamento> meds,
+    List<RegistroMedicamento> historial,
+  ) {
+    const colors = [AppTheme.success, AppTheme.accent, Color(0xFF5E9BFF)];
+
+    return List.generate(meds.length, (i) {
+      final med = meds[i];
+      final registrosMed = historial
+          .where((r) => r.medicamentoId == med.id)
+          .toList();
+
+      final total   = registrosMed.length;
+      final tomados = registrosMed.where((r) => r.fueTomado == 1).length;
+      final adherencia = total == 0 ? 0.0 : tomados / total;
+
+      // Últimos 7 puntos de dosis tomada (o 0 si no fue tomado)
+      final ultimos7 = registrosMed.take(7).toList();
+      final puntos = List.generate(7, (j) {
+        if (j < ultimos7.length) {
+          return ((ultimos7[j].dosisTomada ?? 0) * 1).toInt();
+        }
+        return 0;
+      }).reversed.toList();
+
+      return _MedAnalisis(
+        id:                 med.id ?? 0,
+        nombre:             med.nombre,
+        dosis:              '${med.dosis ?? '--'} ${med.unidad ?? ''}',
+        adherencia:         adherencia,
+        // TODO: calcular reducción real cuando exista endpoint de glucosa
+        reduccionPromedio: (-(adherencia * 30).clamp(0, 40)).toDouble(),
+        color:              colors[i % colors.length],
+        puntos:             puntos,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_cargando) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.accent),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded,
+                color: AppTheme.danger, size: 48),
+            const SizedBox(height: 12),
+            Text(_error!,
+                style: const TextStyle(color: AppTheme.textSecondary),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _cargarDatos,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Análisis de Glucosa'),
         actions: [
-          // Selector de período
           Container(
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -63,7 +158,9 @@ class _AnalisisGlucosaScreenState extends State<AnalisisGlucosaScreen> {
                 icon: const Icon(Icons.expand_more_rounded,
                     color: AppTheme.textMuted, size: 16),
                 style: const TextStyle(
-                    color: AppTheme.accent, fontSize: 13, fontWeight: FontWeight.w600),
+                    color: AppTheme.accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600),
                 items: _periodos
                     .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                     .toList(),
@@ -73,75 +170,87 @@ class _AnalisisGlucosaScreenState extends State<AnalisisGlucosaScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-        children: [
-          // ── Insight principal
-          _InsightBanner(),
-          const SizedBox(height: 20),
+      body: RefreshIndicator(
+        color: AppTheme.accent,
+        onRefresh: _cargarDatos,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+          children: [
+            // ── Insight de adherencia general (dato real)
+            _InsightBanner(adherencia: _adherencia),
+            const SizedBox(height: 20),
 
-          // ── Gráfica de glucosa simulada
-          const SectionLabel('Glucosa en los últimos 7 días'),
-          _GlucosaChart(medicamentos: _medicamentos),
-          const SizedBox(height: 20),
+            // ── Gráfica de glucosa — simulada hasta tener endpoint
+            const SectionLabel('Glucosa en los últimos 7 días'),
+            const _GlucosaChartSimulada(),
+            const SizedBox(height: 20),
 
-          // ── Por medicamento
-          const SectionLabel('Efecto por medicamento'),
-          ..._medicamentos.map((m) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _MedImpactCard(
-              med: m,
-              isSelected: _medSeleccionado == m.nombre,
-              onTap: () => setState(() =>
-                  _medSeleccionado = _medSeleccionado == m.nombre ? null : m.nombre),
+            // ── Por medicamento (adherencia real, reducción estimada)
+            const SectionLabel('Efecto por medicamento'),
+            if (_medAnalisis.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text('Sin medicamentos activos',
+                      style: TextStyle(color: AppTheme.textMuted)),
+                ),
+              )
+            else
+              ..._medAnalisis.map((m) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _MedImpactCard(
+                      med:        m,
+                      isSelected: _medSeleccionado == m.nombre,
+                      onTap: () => setState(() => _medSeleccionado =
+                          _medSeleccionado == m.nombre ? null : m.nombre),
+                    ),
+                  )),
+            const SizedBox(height: 8),
+
+            // ── Correlaciones — simuladas hasta tener endpoint de IA
+            const SectionLabel('Correlaciones detectadas'),
+            // TODO: conectar a endpoint de correlaciones cuando esté disponible
+            const _CorrelacionCard(
+              icon:        Icons.medication_rounded,
+              color:       AppTheme.success,
+              titulo:      'Medicamento + Ejercicio',
+              descripcion: 'Análisis de correlaciones disponible próximamente.',
             ),
-          )),
-          const SizedBox(height: 8),
-
-          // ── Correlaciones
-          const SectionLabel('Correlaciones detectadas'),
-          _CorrelacionCard(
-            icon: Icons.medication_rounded,
-            color: AppTheme.success,
-            titulo: 'Metformina + Ejercicio',
-            descripcion:
-                'La glucosa post-ejercicio baja 34% más cuando Metformina fue tomada en las últimas 4h.',
-          ),
-          const SizedBox(height: 10),
-          _CorrelacionCard(
-            icon: Icons.bedtime_rounded,
-            color: const Color(0xFF5E9BFF),
-            titulo: 'Insulina + Sueño',
-            descripcion:
-                'Noches con >7h de sueño presentan niveles matutinos 12% más bajos tras la dosis nocturna.',
-          ),
-          const SizedBox(height: 10),
-          _CorrelacionCard(
-            icon: Icons.warning_rounded,
-            color: AppTheme.warning,
-            titulo: 'Omisión de Glibenclamida',
-            descripcion:
-                'Los días en que no se tomó Glibenclamida, la glucosa post-almuerzo supera los 160 mg/dL en promedio.',
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
+// ── Widgets ───────────────────────────────────────────────────────────────────
+
 class _InsightBanner extends StatelessWidget {
+  final Adherencia? adherencia;
+  const _InsightBanner({required this.adherencia});
+
   @override
   Widget build(BuildContext context) {
+    final pct     = adherencia?.porcentaje ?? 0;
+    final buena   = pct >= 80;
+    final color   = buena ? AppTheme.success : AppTheme.warning;
+    final icono   = buena ? Icons.trending_up_rounded : Icons.warning_amber_rounded;
+    final titulo  = buena ? 'Adherencia excelente' : 'Adherencia mejorable';
+    final mensaje = adherencia != null
+        ? 'Tomaste ${adherencia!.tomados} de ${adherencia!.total} dosis '
+          'en los últimos 7 días (${pct.toStringAsFixed(1)}%).'
+        : 'No hay datos de adherencia disponibles.';
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1A2A1A), AppTheme.surface],
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.12), AppTheme.surface],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.success.withOpacity(0.3)),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -149,27 +258,23 @@ class _InsightBanner extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: AppTheme.success.withOpacity(0.15),
+              color: color.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.trending_down_rounded,
-                color: AppTheme.success, size: 26),
+            child: Icon(icono, color: color, size: 26),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Control mejorando',
+                Text(titulo,
                     style: TextStyle(
-                        color: AppTheme.success,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700)),
-                SizedBox(height: 4),
-                Text(
-                  'Tu glucosa promedio bajó 11.2 mg/dL esta semana respecto a la anterior. Sigue así.',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                ),
+                        color: color, fontSize: 15, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(mensaje,
+                    style: const TextStyle(
+                        color: AppTheme.textSecondary, fontSize: 12)),
               ],
             ),
           ),
@@ -179,36 +284,36 @@ class _InsightBanner extends StatelessWidget {
   }
 }
 
-class _GlucosaChart extends StatelessWidget {
-  final List<_MedAnalisis> medicamentos;
-  const _GlucosaChart({required this.medicamentos});
+// Gráfica simulada — TODO: reemplazar con datos reales de /glucosa/
+class _GlucosaChartSimulada extends StatelessWidget {
+  const _GlucosaChartSimulada();
 
   @override
   Widget build(BuildContext context) {
-    final dias = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    final dias    = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
     final glucosa = [165, 148, 142, 135, 138, 128, 125];
-
-    final maxVal = 200.0;
-    final minVal = 70.0;
+    const maxVal  = 200.0;
+    const minVal  = 70.0;
 
     return AppCard(
       child: Column(
         children: [
-          // Leyenda de zona objetivo
           Row(
             children: [
-              Container(width: 14, height: 3,
-                  decoration: BoxDecoration(
-                    color: AppTheme.success.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(2),
-                  )),
+              Container(
+                width: 14, height: 3,
+                decoration: BoxDecoration(
+                  color: AppTheme.success.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               const SizedBox(width: 6),
               const Text('Rango objetivo (70-130)',
                   style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
               const Spacer(),
               Container(width: 14, height: 3, color: AppTheme.accent),
               const SizedBox(width: 6),
-              const Text('Glucosa',
+              const Text('Simulado',
                   style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
             ],
           ),
@@ -217,23 +322,43 @@ class _GlucosaChart extends StatelessWidget {
             height: 160,
             child: CustomPaint(
               painter: _ChartPainter(
-                valores: glucosa.map((v) => v.toDouble()).toList(),
-                max: maxVal,
-                min: minVal,
+                valores:   glucosa.map((v) => v.toDouble()).toList(),
+                max:       maxVal,
+                min:       minVal,
                 lineColor: AppTheme.accent,
-                rangoMin: 70,
-                rangoMax: 130,
+                rangoMin:  70,
+                rangoMax:  130,
               ),
               child: const SizedBox.expand(),
             ),
           ),
           const SizedBox(height: 8),
-          // Etiquetas de días
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: dias.map((d) => Text(d,
-                style: const TextStyle(
-                    color: AppTheme.textMuted, fontSize: 11))).toList(),
+            children: dias
+                .map((d) => Text(d,
+                    style: const TextStyle(
+                        color: AppTheme.textMuted, fontSize: 11)))
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceLight,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.info_outline_rounded,
+                    size: 12, color: AppTheme.textMuted),
+                SizedBox(width: 6),
+                Text('Datos simulados — endpoint de glucosa pendiente',
+                    style:
+                        TextStyle(color: AppTheme.textMuted, fontSize: 10)),
+              ],
+            ),
           ),
         ],
       ),
@@ -260,21 +385,13 @@ class _ChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final h = size.height;
     final w = size.width;
-
     double toY(double v) => h - ((v - min) / (max - min)) * h;
 
-    // ── Zona objetivo (fondo verde translúcido)
-    final rangoPaint = Paint()
-      ..color = AppTheme.success.withOpacity(0.08);
+    final rangoPaint = Paint()..color = AppTheme.success.withOpacity(0.08);
     canvas.drawRect(
-      Rect.fromLTRB(0, toY(rangoMax), w, toY(rangoMin)),
-      rangoPaint,
-    );
+        Rect.fromLTRB(0, toY(rangoMax), w, toY(rangoMin)), rangoPaint);
 
-    // ── Líneas horizontales de referencia
-    final refPaint = Paint()
-      ..color = AppTheme.border
-      ..strokeWidth = 1;
+    final refPaint = Paint()..color = AppTheme.border..strokeWidth = 1;
     for (final ref in [100.0, 130.0, 160.0]) {
       canvas.drawLine(Offset(0, toY(ref)), Offset(w, toY(ref)), refPaint);
     }
@@ -282,7 +399,6 @@ class _ChartPainter extends CustomPainter {
     if (valores.isEmpty) return;
     final step = w / (valores.length - 1);
 
-    // ── Área bajo la curva
     final areaPath = Path();
     areaPath.moveTo(0, h);
     for (var i = 0; i < valores.length; i++) {
@@ -300,7 +416,6 @@ class _ChartPainter extends CustomPainter {
         ).createShader(Rect.fromLTWH(0, 0, w, h)),
     );
 
-    // ── Línea principal
     final linePaint = Paint()
       ..color = lineColor
       ..strokeWidth = 2.5
@@ -313,14 +428,13 @@ class _ChartPainter extends CustomPainter {
       } else {
         final prev = Offset((i - 1) * step, toY(valores[i - 1]));
         final curr = Offset(i * step, toY(valores[i]));
-        final cp1 = Offset(prev.dx + step / 2, prev.dy);
-        final cp2 = Offset(curr.dx - step / 2, curr.dy);
+        final cp1  = Offset(prev.dx + step / 2, prev.dy);
+        final cp2  = Offset(curr.dx - step / 2, curr.dy);
         path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, curr.dx, curr.dy);
       }
     }
     canvas.drawPath(path, linePaint);
 
-    // ── Puntos
     final dotPaint = Paint()..color = lineColor;
     final dotBg    = Paint()..color = AppTheme.surface;
     for (var i = 0; i < valores.length; i++) {
@@ -377,8 +491,8 @@ class _MedImpactCard extends StatelessWidget {
                     children: [
                       Text(med.nombre,
                           style: const TextStyle(
-                              color: AppTheme.textPrimary,
-                              fontSize: 14,
+                              color:      AppTheme.textPrimary,
+                              fontSize:   14,
                               fontWeight: FontWeight.w600)),
                       Text(med.dosis,
                           style: const TextStyle(
@@ -392,11 +506,11 @@ class _MedImpactCard extends StatelessWidget {
                     Text(
                       '${med.reduccionPromedio.toStringAsFixed(1)} mg/dL',
                       style: TextStyle(
-                          color: med.color,
-                          fontSize: 15,
+                          color:      med.color,
+                          fontSize:   15,
                           fontWeight: FontWeight.w700),
                     ),
-                    const Text('reducción prom.',
+                    const Text('reducción est.',
                         style: TextStyle(
                             color: AppTheme.textMuted, fontSize: 10)),
                   ],
@@ -407,21 +521,20 @@ class _MedImpactCard extends StatelessWidget {
               const SizedBox(height: 14),
               const Divider(color: AppTheme.border, height: 1),
               const SizedBox(height: 14),
-              // Mini gráfica de barras
               _MiniBars(puntos: med.puntos, color: med.color),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _InfoChip(
-                    icon: Icons.trending_down_rounded,
-                    label: 'Tendencia bajando',
-                    color: AppTheme.success,
-                  ),
-                  _InfoChip(
-                    icon: Icons.check_circle_rounded,
+                    icon:  Icons.check_circle_rounded,
                     label: '${(med.adherencia * 100).round()}% adherencia',
                     color: med.color,
+                  ),
+                  _InfoChip(
+                    icon:  Icons.info_outline_rounded,
+                    label: 'Reducción estimada',
+                    color: AppTheme.textMuted,
                   ),
                 ],
               ),
@@ -440,14 +553,14 @@ class _MiniBars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final max = puntos.reduce((a, b) => a > b ? a : b).toDouble();
+    final max  = puntos.isEmpty ? 1 : puntos.reduce((a, b) => a > b ? a : b);
     final dias = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
     return SizedBox(
       height: 60,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: List.generate(puntos.length, (i) {
-          final ratio = puntos[i] / max;
+          final ratio = max == 0 ? 0.0 : puntos[i] / max;
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -456,17 +569,19 @@ class _MiniBars extends StatelessWidget {
                 children: [
                   Text(puntos[i].toString(),
                       style: TextStyle(
-                          color: color, fontSize: 8, fontWeight: FontWeight.w600)),
+                          color:      color,
+                          fontSize:   8,
+                          fontWeight: FontWeight.w600)),
                   const SizedBox(height: 2),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(3),
                     child: Container(
                       height: 40 * ratio,
-                      color: color.withOpacity(0.6),
+                      color:  color.withOpacity(0.6),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(dias[i],
+                  Text(i < dias.length ? dias[i] : '',
                       style: const TextStyle(
                           color: AppTheme.textMuted, fontSize: 9)),
                 ],
@@ -483,7 +598,8 @@ class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _InfoChip({required this.icon, required this.label, required this.color});
+  const _InfoChip(
+      {required this.icon, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -511,20 +627,21 @@ class _CorrelacionCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String titulo, descripcion;
-  const _CorrelacionCard(
-      {required this.icon,
-      required this.color,
-      required this.titulo,
-      required this.descripcion});
+  const _CorrelacionCard({
+    required this.icon,
+    required this.color,
+    required this.titulo,
+    required this.descripcion,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color:        AppTheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.border),
+        border:       Border.all(color: AppTheme.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,13 +662,15 @@ class _CorrelacionCard extends StatelessWidget {
               children: [
                 Text(titulo,
                     style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 13,
+                        color:      AppTheme.textPrimary,
+                        fontSize:   13,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(descripcion,
                     style: const TextStyle(
-                        color: AppTheme.textSecondary, fontSize: 12, height: 1.4)),
+                        color:    AppTheme.textSecondary,
+                        fontSize: 12,
+                        height:   1.4)),
               ],
             ),
           ),
@@ -561,13 +680,17 @@ class _CorrelacionCard extends StatelessWidget {
   }
 }
 
+// ── Modelos locales ───────────────────────────────────────────────────────────
+
 class _MedAnalisis {
+  final int id;
   final String nombre, dosis;
   final double reduccionPromedio, adherencia;
   final Color color;
   final List<int> puntos;
 
   const _MedAnalisis({
+    required this.id,
     required this.nombre,
     required this.dosis,
     required this.reduccionPromedio,
