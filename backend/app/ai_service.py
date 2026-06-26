@@ -9,7 +9,7 @@ class AIService:
 
     def __init__(self):
         self.client = OpenAI(
-            api_key="",
+            api_key="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",
             base_url="https://api.groq.com/openai/v1"
         )
 
