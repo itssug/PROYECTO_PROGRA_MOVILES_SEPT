@@ -386,7 +386,9 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
         child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
       ),
       onDismissed: (_) => _eliminarRegistro(r),
-      child: Container(
+      child: GestureDetector(
+        onTap: () => _openEditSheet(r),
+        child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(14)),
@@ -423,8 +425,33 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
                     style: const TextStyle(color: _textSub, fontSize: 11)),
               ],
             ),
+            const SizedBox(width: 8),
+            const Icon(Icons.edit_outlined, color: _textSub, size: 16),
           ],
         ),
+      ),
+      ),
+    );
+  }
+
+  // ── NUEVO: Abrir sheet de edición ────────────────────────
+  void _openEditSheet(RegistroComidaApi registro) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditFoodSheet(
+        registro: registro,
+        onSaved: () {
+          Navigator.pop(context);
+          _loadData();
+          _showSnack('Registro actualizado.');
+        },
+        onDeleted: () {
+          Navigator.pop(context);
+          _loadData();
+          _showSnack('Registro eliminado.');
+        },
       ),
     );
   }
@@ -895,6 +922,343 @@ class _AddFoodSheetState extends State<_AddFoodSheet> {
           color: c.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
       child: Text('IG $ig',
           style: TextStyle(color: c, fontSize: 11, fontWeight: FontWeight.bold)),
+    );
+  }
+}
+
+// ─── Bottom Sheet para EDITAR un Registro ─────────────────────
+
+class _EditFoodSheet extends StatefulWidget {
+  final RegistroComidaApi registro;
+  final VoidCallback onSaved;
+  final VoidCallback onDeleted;
+
+  const _EditFoodSheet({
+    required this.registro,
+    required this.onSaved,
+    required this.onDeleted,
+  });
+
+  @override
+  State<_EditFoodSheet> createState() => _EditFoodSheetState();
+}
+
+class _EditFoodSheetState extends State<_EditFoodSheet> {
+  late TextEditingController _cantidadCtrl;
+  late String _tipoComida;
+  late TimeOfDay _hora;
+  bool _saving = false;
+  bool _deleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cantidadCtrl = TextEditingController(
+        text: widget.registro.cantidad.toStringAsFixed(0));
+    _tipoComida = widget.registro.tipoComida;
+
+    // Parsear hora del registro ("HH:mm:ss" o "HH:mm")
+    try {
+      final parts = widget.registro.hora.split(':');
+      _hora = TimeOfDay(
+        hour: int.parse(parts[0]),
+        minute: int.parse(parts[1]),
+      );
+    } catch (_) {
+      _hora = TimeOfDay.now();
+    }
+  }
+
+  @override
+  void dispose() {
+    _cantidadCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    final cant = double.tryParse(_cantidadCtrl.text);
+    if (cant == null || cant <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa una cantidad válida.')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final horaStr =
+          '${_hora.hour.toString().padLeft(2, '0')}:${_hora.minute.toString().padLeft(2, '0')}:00';
+      await AlimentacionService.editarRegistro(
+        registroId: widget.registro.id,
+        cantidad: cant,
+        tipoComida: _tipoComida,
+        hora: horaStr,
+      );
+      widget.onSaved();
+    } on AlimentacionException catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _eliminar() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: _card,
+        title: const Text('¿Eliminar registro?',
+            style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: Text(
+          'Se eliminará "${widget.registro.comidaNombre}" de tus registros.',
+          style: const TextStyle(color: _textSub, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar', style: TextStyle(color: _textSub)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    setState(() => _deleting = true);
+    try {
+      await AlimentacionService.eliminarRegistro(widget.registro.id);
+      widget.onDeleted();
+    } on AlimentacionException catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final r = widget.registro;
+
+    return Container(
+      padding: EdgeInsets.only(bottom: bottom),
+      decoration: const BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Editar Registro',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+
+            // ── Info del alimento (solo lectura) ──────────────
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _bg,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42, height: 42,
+                    decoration: BoxDecoration(
+                        color: _orange.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.restaurant_menu_rounded,
+                        color: _orange, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(r.comidaNombre,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15)),
+                        Text('${r.comidaCategoria} · ${r.unidad}',
+                            style: const TextStyle(color: _textSub, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Text('${(r.caloriasCalculadas ?? 0).toStringAsFixed(0)} kcal',
+                      style: const TextStyle(color: _orange, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Cantidad ──────────────────────────────────────
+            const Text('Cantidad', style: TextStyle(color: _textSub, fontSize: 12)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _cantidadCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: r.cantidad.toStringAsFixed(0),
+                hintStyle: const TextStyle(color: Colors.white38),
+                suffixText: r.unidad,
+                suffixStyle: const TextStyle(color: _textSub),
+                filled: true,
+                fillColor: _bg,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _orange, width: 1.5)),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Tipo de comida ────────────────────────────────
+            const Text('Tipo de comida', style: TextStyle(color: _textSub, fontSize: 12)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _tipoComidaOptions.map((t) {
+                final active = _tipoComida == t.$1;
+                return GestureDetector(
+                  onTap: () => setState(() => _tipoComida = t.$1),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: active ? _orange : _bg,
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: active ? _orange : Colors.white12),
+                    ),
+                    child: Text(t.$2,
+                        style: TextStyle(
+                          color: active ? Colors.white : _textSub,
+                          fontSize: 13,
+                          fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                        )),
+                  ),
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Hora ──────────────────────────────────────────
+            const Text('Hora', style: TextStyle(color: _textSub, fontSize: 12)),
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: _hora,
+                  builder: (ctx, child) => Theme(
+                    data: ThemeData.dark().copyWith(
+                        colorScheme: const ColorScheme.dark(primary: _orange)),
+                    child: child!,
+                  ),
+                );
+                if (picked != null) setState(() => _hora = picked);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                    color: _bg, borderRadius: BorderRadius.circular(12)),
+                child: Row(children: [
+                  const Icon(Icons.access_time_rounded, color: _orange, size: 18),
+                  const SizedBox(width: 8),
+                  Text(_hora.format(context),
+                      style: const TextStyle(color: Colors.white)),
+                ]),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── Botones ───────────────────────────────────────
+            Row(
+              children: [
+                // Botón eliminar
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _deleting ? null : _eliminar,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: Center(
+                        child: _deleting
+                            ? const SizedBox(width: 20, height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.redAccent, strokeWidth: 2))
+                            : const Text('Eliminar',
+                                style: TextStyle(
+                                    color: Colors.redAccent,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14)),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Botón guardar
+                Expanded(
+                  flex: 2,
+                  child: GestureDetector(
+                    onTap: _saving ? null : _guardar,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: _orange,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Center(
+                        child: _saving
+                            ? const SizedBox(width: 20, height: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2))
+                            : const Text('Guardar Cambios',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14)),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

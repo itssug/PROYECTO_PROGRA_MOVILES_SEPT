@@ -12,6 +12,7 @@ from .serializers import (
     ComidaCreateSerializer,
     RegistroComidaSerializer,
     RegistroComidaCreateSerializer,
+    RegistroComidaUpdateSerializer,  # ← NUEVO
 )
 
 
@@ -161,25 +162,74 @@ class RegistroComidaListView(APIView):
 
 
 class RegistroComidaDeleteView(APIView):
-    """DELETE /api/alimentacion/registro/<id>/"""
+    """
+    PUT    /api/alimentacion/registro/<id>/  → editar registro  ← NUEVO
+    DELETE /api/alimentacion/registro/<id>/  → eliminar registro
+    """
     permission_classes = [AllowAny]
     authentication_classes = []
 
-    def delete(self, request, pk):
+    def _get_registro(self, request, pk):
+        """Helper: obtiene usuario y registro, o devuelve error."""
         usuario = obtener_usuario(request)
         if not usuario:
-            return Response(
+            return None, None, Response(
                 {"error": "Token inválido."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-
         try:
-            registro = RegistroComidas.objects.get(id=pk, usuario_id=usuario.id)
+            registro = RegistroComidas.objects.select_related('comida').get(
+                id=pk, usuario_id=usuario.id,
+            )
+            return usuario, registro, None
         except RegistroComidas.DoesNotExist:
-            return Response(
+            return usuario, None, Response(
                 {"error": "Registro no encontrado."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+    # ── NUEVO: Editar un registro ──────────────────────────
+    def put(self, request, pk):
+        usuario, registro, error = self._get_registro(request, pk)
+        if error:
+            return error
+
+        serializer = RegistroComidaUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+
+        # Si cambió la cantidad → recalcular valores nutricionales
+        if 'cantidad' in data:
+            registro.cantidad = data['cantidad']
+            comida = registro.comida
+            porcion = comida.porcion_tipica or Decimal('100')
+            factor = Decimal(str(data['cantidad'])) / porcion
+            registro.calorias_calculadas = (comida.calorias or 0) * factor
+            registro.carbohidratos_calculados = (comida.carbohidratos or 0) * factor
+            registro.azucares_calculados = (comida.azucares or 0) * factor
+            registro.carga_glucemica_calc = (comida.carga_glucemica or 0) * factor
+
+        if 'tipo_comida' in data:
+            registro.tipo_comida = data['tipo_comida']
+        if 'hora' in data:
+            registro.hora = data['hora']
+        if 'unidad' in data:
+            registro.unidad = data['unidad']
+        if 'notas' in data:
+            registro.notas = data['notas']
+
+        registro.save()
+        return Response(
+            RegistroComidaSerializer(registro).data,
+            status=status.HTTP_200_OK,
+        )
+
+    def delete(self, request, pk):
+        _, registro, error = self._get_registro(request, pk)
+        if error:
+            return error
 
         registro.delete()
         return Response(
@@ -239,6 +289,7 @@ class ResumenDiarioView(APIView):
             "por_tipo_comida": por_tipo,
         })
 
+
 class ResumenHistoricoView(APIView):
     """
     GET /api/alimentacion/historico/?dias=7
@@ -251,14 +302,14 @@ class ResumenHistoricoView(APIView):
         usuario = obtener_usuario(request)
         if not usuario:
             return Response({"error": "Token inválido."}, status=status.HTTP_401_UNAUTHORIZED)
-        
+
         from datetime import date, timedelta
-        from core.models import Objetivos # Aseguramos importar Objetivos
+        from core.models import Objetivos
 
         dias = int(request.query_params.get('dias', 7))
         hoy = date.today()
-        fecha_inicio = hoy - timedelta(days=dias-1)
-        
+        fecha_inicio = hoy - timedelta(days=dias - 1)
+
         # 1. Obtener la meta real del usuario de la tabla `objetivos`
         objetivo_activo = Objetivos.objects.filter(usuario_id=usuario.id, activo=1).first()
         meta_calorias = float(objetivo_activo.calorias_diarias) if objetivo_activo and objetivo_activo.calorias_diarias else 1800.0
@@ -276,14 +327,13 @@ class ResumenHistoricoView(APIView):
             } for i in range(dias)
         }
 
-        # 4. Sumar la data. Las proteínas y grasas no están en registro_comidas, 
-        # así que las calculamos matemáticamente usando comida.porcion_tipica
+        # 4. Sumar la data
         for r in registros:
             fecha_str = r.fecha.strftime('%Y-%m-%d')
             if fecha_str in historial:
                 historial[fecha_str]['calorias'] += float(r.calorias_calculadas or 0)
                 historial[fecha_str]['carbos'] += float(r.carbohidratos_calculados or 0)
-                
+
                 porcion = float(r.comida.porcion_tipica or 100)
                 factor = float(r.cantidad) / porcion if porcion > 0 else 0
                 historial[fecha_str]['proteinas'] += float(r.comida.proteinas or 0) * factor
@@ -291,7 +341,7 @@ class ResumenHistoricoView(APIView):
 
         # Formatear la salida
         datos_dias = [{"fecha": f, **datos} for f, datos in historial.items()]
-        
+
         return Response({
             "meta_calorias_diarias": meta_calorias,
             "historial": datos_dias
@@ -301,7 +351,7 @@ class ResumenHistoricoView(APIView):
 class DietasCatologoView(APIView):
     """
     GET /api/alimentacion/dietas/
-    Sirve el catálogo de dietas de forma estática (sin requerir tabla en BD).
+    Sirve el catálogo de dietas de forma estática.
     """
     permission_classes = [AllowAny]
     authentication_classes = []

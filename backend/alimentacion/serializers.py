@@ -97,3 +97,28 @@ class RegistroComidaCreateSerializer(serializers.Serializer):
                 f"Unidad inválida. Opciones: {', '.join(UNIDADES_VALIDAS)}"
             )
         return value
+
+
+# ── NUEVO: Serializer para editar un registro existente ──────
+class RegistroComidaUpdateSerializer(serializers.Serializer):
+    """Serializer para editar un registro de comida."""
+    cantidad = serializers.DecimalField(max_digits=7, decimal_places=2, required=False)
+    tipo_comida = serializers.CharField(max_length=12, required=False)
+    hora = serializers.TimeField(required=False)
+    unidad = serializers.CharField(max_length=9, required=False)
+    notas = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def validate_tipo_comida(self, value):
+        validos = ['desayuno', 'media_manana', 'almuerzo', 'merienda', 'cena', 'snack']
+        if value not in validos:
+            raise serializers.ValidationError(
+                f"Tipo de comida inválido. Opciones: {', '.join(validos)}"
+            )
+        return value
+
+    def validate_unidad(self, value):
+        if value and value not in UNIDADES_VALIDAS:
+            raise serializers.ValidationError(
+                f"Unidad inválida. Opciones: {', '.join(UNIDADES_VALIDAS)}"
+            )
+        return value

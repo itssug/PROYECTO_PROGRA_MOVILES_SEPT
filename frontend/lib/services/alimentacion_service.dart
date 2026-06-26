@@ -181,7 +181,6 @@ class AlimentacionService {
   static const String _base = '${ApiConfig.baseUrl}/api/alimentacion';
   static const Duration _timeout = Duration(seconds: 15);
 
-  /// Headers con token de autenticación
   static Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         'Authorization': 'Token ${AuthService.token}',
@@ -189,7 +188,6 @@ class AlimentacionService {
 
   // ── BUSCAR ALIMENTOS ────────────────────────────────────────
 
-  /// Busca alimentos en el catálogo por nombre.
   static Future<List<ComidaApi>> buscarAlimentos(String query) async {
     try {
       final url = '$_base/comidas/?buscar=${Uri.encodeComponent(query)}';
@@ -208,7 +206,6 @@ class AlimentacionService {
     }
   }
 
-  /// Obtiene todo el catálogo, opcionalmente filtrado por categoría.
   static Future<List<ComidaApi>> getCatalogo({String? categoria}) async {
     try {
       String url = '$_base/comidas/';
@@ -231,7 +228,6 @@ class AlimentacionService {
 
   // ── REGISTROS DE COMIDAS ────────────────────────────────────
 
-  /// Obtiene los registros de comida del usuario para una fecha.
   static Future<List<RegistroComidaApi>> getRegistrosDia({String? fecha}) async {
     try {
       String url = '$_base/registro/';
@@ -255,7 +251,6 @@ class AlimentacionService {
     }
   }
 
-  /// Registra una comida consumida.
   static Future<RegistroComidaApi> registrarComida({
     required int comidaId,
     required double cantidad,
@@ -291,7 +286,6 @@ class AlimentacionService {
         throw AlimentacionException('Sesión expirada.');
       }
 
-      // Intentar extraer mensaje de error
       try {
         final error = jsonDecode(res.body);
         final msg = error.values.first;
@@ -299,6 +293,55 @@ class AlimentacionService {
             msg is List ? msg.first.toString() : msg.toString());
       } catch (_) {
         throw AlimentacionException('Error al registrar comida: ${res.statusCode}');
+      }
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  // ── NUEVO: EDITAR REGISTRO DE COMIDA ────────────────────────
+  static Future<RegistroComidaApi> editarRegistro({
+    required int registroId,
+    double? cantidad,
+    String? tipoComida,
+    String? hora,
+    String? unidad,
+    String? notas,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (cantidad != null) body['cantidad'] = cantidad;
+      if (tipoComida != null) body['tipo_comida'] = tipoComida;
+      if (hora != null) body['hora'] = hora;
+      if (unidad != null) body['unidad'] = unidad;
+      if (notas != null) body['notas'] = notas;
+
+      final res = await http
+          .put(
+            Uri.parse('$_base/registro/$registroId/'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        return RegistroComidaApi.fromJson(jsonDecode(res.body));
+      }
+      if (res.statusCode == 401) {
+        throw AlimentacionException('Sesión expirada.');
+      }
+      if (res.statusCode == 404) {
+        throw AlimentacionException('Registro no encontrado.');
+      }
+
+      try {
+        final error = jsonDecode(res.body);
+        final msg = error.values.first;
+        throw AlimentacionException(
+            msg is List ? msg.first.toString() : msg.toString());
+      } catch (_) {
+        throw AlimentacionException('Error al editar registro: ${res.statusCode}');
       }
     } catch (e) {
       if (e is AlimentacionException) rethrow;
@@ -322,7 +365,6 @@ class AlimentacionService {
     }
   }
 
-  /// Obtiene el catálogo de dietas.
   static Future<List<dynamic>> getDietasCatalogo() async {
     try {
       final res = await http
@@ -338,7 +380,6 @@ class AlimentacionService {
     }
   }
 
-  /// Elimina un registro de comida.
   static Future<void> eliminarRegistro(int registroId) async {
     try {
       final res = await http
@@ -359,7 +400,6 @@ class AlimentacionService {
 
   // ── RESUMEN DIARIO ──────────────────────────────────────────
 
-  /// Obtiene el resumen nutricional de un día.
   static Future<ResumenDiario> getResumenDia({String? fecha}) async {
     try {
       String url = '$_base/resumen/';
@@ -384,7 +424,6 @@ class AlimentacionService {
 
   // ── ALIMENTOS PERSONALIZADOS ────────────────────────────────
 
-  /// Crea un alimento personalizado en el catálogo.
   static Future<ComidaApi> crearAlimentoPersonalizado({
     required String nombre,
     required String categoria,
