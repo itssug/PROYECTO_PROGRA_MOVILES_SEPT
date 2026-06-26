@@ -32,6 +32,7 @@ class DatasetBuilder:
                 "horas_sueno": horas_sueno,
                 "estres": estres,
                 "ejercicio": ejercicio,
+                "medicamento_tomado": getattr(r, 'medicamento_tomado', 0),
                 "glucosa_despues": r.glucosa_despues
             })
 
@@ -63,6 +64,7 @@ class DatasetBuilder:
                 "horas_sueno": horas_sueno,
                 "estres": estres,
                 "ejercicio": ejercicio,
+                "medicamento_tomado": getattr(r, 'medicamento_tomado', 0),
                 "glucosa_despues": r.glucosa_despues
             })
 

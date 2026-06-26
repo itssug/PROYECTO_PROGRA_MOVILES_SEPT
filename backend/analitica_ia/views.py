@@ -11,6 +11,11 @@ from .services.pattern_discovery import generar_patrones_usuario
 import os
 from django.conf import settings
 from datetime import datetime
+from django.utils import timezone
+from django.db.models import Sum
+
+from core.models import Glucosa, RegistroSueno, EstadoEmocional, ActividadFisica, RegistroMedicamentos
+from core.services.alertas_service import AlertasService
 
 class TrainModelView(APIView):
     def post(self, request, usuario_id):
@@ -50,6 +55,7 @@ class PrediccionGlucosaView(APIView):
         "horas_sueno":     (3, 12),
         "estres":          (1, 10),
         "ejercicio":       (0, 120),
+        "medicamento_tomado": (0, 1),
     }
 
     # Umbrales clínicos para override del modelo
@@ -67,13 +73,39 @@ class PrediccionGlucosaView(APIView):
         except FileNotFoundError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ── Valores originales
-        glucosa_antes   = serializer.validated_data["glucosa_antes"]
+        glucosa_antes   = serializer.validated_data.get("glucosa_antes")
         carbohidratos   = serializer.validated_data["carbohidratos"]
         carga_glucemica = serializer.validated_data["carga_glucemica"]
-        horas_sueno     = serializer.validated_data["horas_sueno"]
-        estres          = serializer.validated_data["estres"]
-        ejercicio       = serializer.validated_data["ejercicio"]
+        horas_sueno     = serializer.validated_data.get("horas_sueno")
+        estres          = serializer.validated_data.get("estres")
+        ejercicio       = serializer.validated_data.get("ejercicio")
+        medicamento_tomado = serializer.validated_data.get("medicamento_tomado")
+
+        hoy = timezone.now().date()
+
+        # Fetch from DB if not provided
+        if glucosa_antes is None:
+            g = Glucosa.objects.filter(usuario_id=usuario_id, fecha=hoy).order_by('-hora').first()
+            glucosa_antes = g.nivel_glucosa if g else 120.0
+
+        if horas_sueno is None:
+            s = RegistroSueno.objects.filter(usuario_id=usuario_id, fecha=hoy).first()
+            horas_sueno = float(s.horas_dormidas) if s else 7.0
+
+        if estres is None:
+            e = EstadoEmocional.objects.filter(usuario_id=usuario_id, fecha=hoy).first()
+            estres = e.nivel_estres if e else 3
+
+        if ejercicio is None:
+            acts = ActividadFisica.objects.filter(usuario_id=usuario_id, fecha=hoy).aggregate(Sum('duracion'))
+            ejercicio = float(acts['duracion__sum'] or 0.0)
+
+        if medicamento_tomado is None:
+            meds = RegistroMedicamentos.objects.filter(usuario_id=usuario_id, fecha=hoy, fue_tomado=1).exists()
+            medicamento_tomado = 1 if meds else 0
+
+            if medicamento_tomado == 0:
+                AlertasService.alerta_medicamento(usuario_id)
 
         avisos = []
         fuera_de_rango = False
@@ -100,6 +132,7 @@ class PrediccionGlucosaView(APIView):
             "horas_sueno":     max(min(horas_sueno, 12), 3),
             "estres":          max(min(estres, 10), 1),
             "ejercicio":       max(min(ejercicio, 120), 0),
+            "medicamento_tomado": max(min(medicamento_tomado, 1), 0),
         }
 
         # ── Predicción del modelo (con inputs clampeados)
@@ -109,7 +142,8 @@ class PrediccionGlucosaView(APIView):
             inputs_clamped["carga_glucemica"],
             inputs_clamped["horas_sueno"],
             inputs_clamped["estres"],
-            inputs_clamped["ejercicio"]
+            inputs_clamped["ejercicio"],
+            inputs_clamped["medicamento_tomado"]
         )
 
         glucosa_modelo = resultado["valor"]
@@ -160,6 +194,12 @@ class PrediccionGlucosaView(APIView):
                     "La cantidad de carbohidratos/carga glucémica es alta. "
                     "Riesgo ajustado a MEDIO por regla clínica."
                 )
+
+        # ── Generar alertas basadas en la predicción
+        AlertasService.recordatorio_postprandial(usuario_id)
+
+        if riesgo == "ALTO":
+            AlertasService.alerta_riesgo_ia(usuario_id, glucosa_final)
 
         response_data = {
             "glucosa_predicha": glucosa_final,

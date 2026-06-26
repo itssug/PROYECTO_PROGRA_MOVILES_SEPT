@@ -38,7 +38,8 @@ class PredictorGlucosa:
         carga_glucemica,
         horas_sueno,
         estres,
-        ejercicio
+        ejercicio,
+        medicamento_tomado
     ):
 
         datos = [[
@@ -47,7 +48,8 @@ class PredictorGlucosa:
             carga_glucemica,
             horas_sueno,
             estres,
-            ejercicio
+            ejercicio,
+            medicamento_tomado
         ]]
 
         resultado = self.modelo.predict(datos)

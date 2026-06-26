@@ -34,7 +34,8 @@ def entrenar_modelo_usuario(usuario_id):
             "carga_glucemica",
             "horas_sueno",
             "estres",
-            "ejercicio"
+            "ejercicio",
+            "medicamento_tomado"
         ]
     ]
 
@@ -96,7 +97,8 @@ def entrenar_modelo_global():
             "carga_glucemica",
             "horas_sueno",
             "estres",
-            "ejercicio"
+            "ejercicio",
+            "medicamento_tomado"
         ]
     ]
 

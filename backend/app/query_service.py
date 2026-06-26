@@ -1,5 +1,7 @@
+import os
 from datetime import date, timedelta
-from core.models import Usuarios, Glucosa, Objetivos, ResumenDiario
+from django.conf import settings
+from core.models import Usuarios, Glucosa, Objetivos, ResumenDiario, RegistroComidas
 
 
 class QueryService:
@@ -16,12 +18,29 @@ class QueryService:
 
         return {
             "perfil":        self._get_perfil(user),
+            "ultima_glucosa": self._get_ultima_glucosa(user),
             "glucosa_hoy":   self._get_glucosa_hoy(user),
             "glucosa_semana": self._get_glucosa_semana(user),
             "resumen_semana": self._get_resumen_semana(user),
             "glucosa_global": self._get_glucosa_global(user),
             "objetivos":     self._get_objetivos(user),
+            "consumos_hoy":  self._get_consumos_hoy(user),
+            "modelo_prediccion": self._get_modelo_prediccion(user),
         }
+
+    # ── Sistema ML ────────────────────────────────────────────────────────────
+
+    def _get_modelo_prediccion(self, user) -> str:
+        ruta_usuario = os.path.join(
+            settings.BASE_DIR,
+            "media",
+            "models",
+            f"user_{user.id}_rf.joblib"
+        )
+        if os.path.exists(ruta_usuario):
+            return "Personalizado (Entrenado con tus propios datos)"
+        else:
+            return "Global (Modelo general por defecto)"
 
     # ── Perfil básico ─────────────────────────────────────────────────────────
 
@@ -51,6 +70,32 @@ class QueryService:
             }
             for r in registros
         ]
+
+    # ── Última glucosa registrada ─────────────────────────────────────────────
+
+    def _get_ultima_glucosa(self, user) -> dict:
+        r = Glucosa.objects.filter(usuario=user).order_by("-fecha", "-hora").first()
+        if not r:
+            return {}
+        return {
+            "fecha":         str(r.fecha),
+            "hora":          str(r.hora),
+            "nivel":         str(r.nivel_glucosa),
+            "tipo_medicion": r.tipo_medicion,
+            "clasificacion": r.clasificacion,
+        }
+
+    # ── Consumos de hoy ───────────────────────────────────────────────────────
+
+    def _get_consumos_hoy(self, user) -> dict:
+        comidas = RegistroComidas.objects.filter(usuario=user, fecha=date.today())
+        calorias = sum([float(c.calorias_calculadas or 0) for c in comidas])
+        carbohidratos = sum([float(c.carbohidratos_calculados or 0) for c in comidas])
+        return {
+            "calorias": round(calorias, 2),
+            "carbohidratos": round(carbohidratos, 2),
+            "total_comidas": comidas.count()
+        }
 
     # ── Últimos 7 días ────────────────────────────────────────────────────────
 

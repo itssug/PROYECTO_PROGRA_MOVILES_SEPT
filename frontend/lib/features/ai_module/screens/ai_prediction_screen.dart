@@ -55,6 +55,7 @@ class _AiPredictionScreenState extends State<AiPredictionScreen>
   late double _horasSueno;
   late int _estres;
   late double _ejercicio;
+  bool _medicamentoTomado = true;
 
   late AnimationController _resultController;
   late Animation<double> _resultFade;
@@ -242,12 +243,12 @@ class _AiPredictionScreenState extends State<AiPredictionScreen>
     });
 
     final data = {
-      'glucosa_antes':   _glucosaAntes,
+      'glucosa_antes': _glucosaAntes,
       'carbohidratos':   _totalCarbs,
       'carga_glucemica': _totalCargaGlucemica,
-      'horas_sueno':     _horasSueno,
-      'estres':          _estres,
-      'ejercicio':       _ejercicio,
+      'horas_sueno': _horasSueno,
+      'estres': _estres,
+      'ejercicio': _ejercicio,
     };
 
     final result = await _aiService.predictRisk(widget.userId, data);
@@ -300,9 +301,9 @@ class _AiPredictionScreenState extends State<AiPredictionScreen>
             const SizedBox(height: 20),
 
             // ── Datos de contexto
-            _SectionTitle(title: 'TUS DATOS ACTUALES', icon: Icons.person_outline_rounded),
+            _SectionTitle(title: 'TUS DATOS METABÓLICOS', icon: Icons.cloud_sync_rounded),
             const SizedBox(height: 10),
-            _buildContextGrid(),
+            _buildAutoContextBanner(),
             const SizedBox(height: 20),
 
             // ── Selección de alimentos
@@ -363,15 +364,16 @@ class _AiPredictionScreenState extends State<AiPredictionScreen>
                       const SizedBox(height: 8),
                       AiRecommendationList(recommendations: _recommendations),
                     ],
+                    const SizedBox(height: 12),
+                    _DisclaimerNote(),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
+              _SectionTitle(title: 'ACERCA DE ESTA PREDICCIÓN', icon: Icons.psychology_rounded),
+              const SizedBox(height: 10),
               _buildModelExplanation(),
             ],
-
-            const SizedBox(height: 20),
-            _buildHowItWorks(),
           ],
         ),
       ),
@@ -436,7 +438,7 @@ class _AiPredictionScreenState extends State<AiPredictionScreen>
     );
   }
 
-  Widget _buildContextGrid() {
+  Widget _buildAutoContextBanner() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -444,48 +446,34 @@ class _AiPredictionScreenState extends State<AiPredictionScreen>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFF2C2C38)),
       ),
-      child: Column(
+      child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Tomados de tu último registro',
-            style: TextStyle(color: Color(0xFF4A4A58), fontSize: 11),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _ContextChip(
-                icon: Icons.bloodtype_rounded,
-                label: 'Glucosa basal',
-                value: '${_glucosaAntes.toStringAsFixed(0)} mg/dL',
-                color: const Color(0xFFFF3B30),
-              )),
-              const SizedBox(width: 8),
-              Expanded(child: _ContextChip(
-                icon: Icons.bedtime_rounded,
-                label: 'Sueño',
-                value: '${_horasSueno.toStringAsFixed(1)} h',
-                color: const Color(0xFF5E9BFF),
-              )),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _ContextChip(
-                icon: Icons.self_improvement_rounded,
-                label: 'Estrés',
-                value: '$_estres / 10',
-                color: const Color(0xFFBE8FFF),
-              )),
-              const SizedBox(width: 8),
-              Expanded(child: _ContextChip(
-                icon: Icons.directions_run_rounded,
-                label: 'Ejercicio',
-                value: '${_ejercicio.toStringAsFixed(0)} min',
-                color: const Color(0xFF34C759),
-              )),
-            ],
+          Icon(Icons.auto_awesome_rounded, color: Color(0xFF5E9BFF), size: 24),
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sincronización Automática',
+                  style: TextStyle(
+                    color: Color(0xFFF5F5F7),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'El motor de IA buscará automáticamente en tu expediente tu última medición de glucosa, horas de sueño, estrés, ejercicio y si tomaste tu medicamento hoy.',
+                  style: TextStyle(
+                    color: Color(0xFF8E8E9A),
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -809,69 +797,32 @@ class _AiPredictionScreenState extends State<AiPredictionScreen>
   }
 
   Widget _buildModelExplanation() {
-    final isPersonalized = !_result!.modelUsed.toLowerCase().contains('global');
+    final bool isPersonalized = !_result!.modelUsed.toLowerCase().contains('global');
+
     return Column(
       children: [
-        _ModelTypeCard(
-          icon: Icons.hub_rounded,
-          title: 'Modelo Global',
-          subtitle: 'Entrenado con datos de múltiples usuarios',
-          isActive: !isPersonalized,
-          gradientColors: const [Color(0xFF1A237E), Color(0xFF283593)],
-          accentColor: const Color(0xFF7986CB),
-        ),
-        const SizedBox(height: 10),
-        _ModelTypeCard(
-          icon: Icons.person_rounded,
-          title: 'Modelo Personalizado',
-          subtitle: 'Entrenado exclusivamente con tus datos',
-          isActive: isPersonalized,
-          gradientColors: const [Color(0xFF8B2500), Color(0xFFE55A00)],
-          accentColor: const Color(0xFFFF8A50),
-        ),
-        if (!isPersonalized) ...[
+        if (isPersonalized)
+          _ModelTypeCard(
+            icon: Icons.person_rounded,
+            title: 'Modelo Personalizado',
+            subtitle: 'Entrenado exclusivamente con tu metabolismo',
+            isActive: true,
+            gradientColors: const [Color(0xFF8B2500), Color(0xFFE55A00)],
+            accentColor: const Color(0xFFFF8A50),
+          )
+        else ...[
+          _ModelTypeCard(
+            icon: Icons.hub_rounded,
+            title: 'Modelo Global',
+            subtitle: 'Entrenado con datos médicos de múltiples pacientes',
+            isActive: true,
+            gradientColors: const [Color(0xFF1A237E), Color(0xFF283593)],
+            accentColor: const Color(0xFF7986CB),
+          ),
           const SizedBox(height: 10),
           _UpgradeHint(),
         ],
       ],
-    );
-  }
-
-  Widget _buildHowItWorks() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2C2C38)),
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.code_rounded, color: Color(0xFF8E8E9A), size: 16),
-              SizedBox(width: 8),
-              Text('CÓMO FUNCIONA', style: TextStyle(
-                color: Color(0xFF8E8E9A), fontSize: 11,
-                fontWeight: FontWeight.w600, letterSpacing: 1.0,
-              )),
-            ],
-          ),
-          SizedBox(height: 14),
-          _HowStep(number: '1', title: 'Eliges tus alimentos',
-            description: 'Seleccionas de la base de datos lo que vas a comer y ajustas las porciones.',
-            color: Color(0xFF5E9BFF)),
-          SizedBox(height: 10),
-          _HowStep(number: '2', title: 'Se calculan carbos y carga glucémica',
-            description: 'El sistema suma automáticamente los macros de tu plato completo.',
-            color: Color(0xFFFF7A00)),
-          SizedBox(height: 10),
-          _HowStep(number: '3', title: 'Random Forest predice',
-            description: 'Con 6 variables (glucosa + comida + contexto) estima tu glucosa ~2h post-comida.',
-            color: Color(0xFF34C759)),
-        ],
-      ),
     );
   }
 }
@@ -953,20 +904,32 @@ class _FoodPortionCard extends StatelessWidget {
                 style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
               ),
               Expanded(
-                child: Slider(
-                  value: food.cantidad,
-                  min: food.comida.unidadMedida == 'gramos' || food.comida.unidadMedida == 'ml'
-                      ? 10
-                      : 0.5,
-                  max: food.comida.unidadMedida == 'gramos' || food.comida.unidadMedida == 'ml'
-                      ? 500
-                      : 5,
-                  divisions: food.comida.unidadMedida == 'gramos' || food.comida.unidadMedida == 'ml'
-                      ? 49
-                      : 9,
-                  activeColor: const Color(0xFFFF7A00),
-                  inactiveColor: const Color(0xFF2C2C38),
-                  onChanged: onPortionChanged,
+                child: Builder(
+                  builder: (context) {
+                    final unidad = food.comida.unidadMedida.toLowerCase();
+                    final bool isGramOrMl = unidad == 'gramos' || unidad == 'g' || unidad == 'ml' || unidad == 'mililitros';
+                    double minVal = isGramOrMl ? 10.0 : 0.5;
+                    double maxVal = isGramOrMl ? 500.0 : 5.0;
+
+                    if (food.cantidad > maxVal) maxVal = food.cantidad.toDouble();
+                    if (food.cantidad < minVal) minVal = food.cantidad.toDouble();
+                    if (minVal == maxVal) maxVal = minVal + (isGramOrMl ? 100 : 5);
+
+                    int divs = isGramOrMl 
+                        ? ((maxVal - minVal) / 10).round() 
+                        : ((maxVal - minVal) / 0.5).round();
+                    if (divs < 1) divs = 1;
+
+                    return Slider(
+                      value: food.cantidad.toDouble(),
+                      min: minVal,
+                      max: maxVal,
+                      divisions: divs,
+                      activeColor: const Color(0xFFFF7A00),
+                      inactiveColor: const Color(0xFF2C2C38),
+                      onChanged: onPortionChanged,
+                    );
+                  }
                 ),
               ),
               Container(
@@ -1221,8 +1184,33 @@ class _UpgradeHint extends StatelessWidget {
           Icon(Icons.trending_up_rounded, color: Color(0xFFFFCC00), size: 18),
           SizedBox(width: 10),
           Expanded(child: Text(
-            'Acumula más registros para desbloquear el modelo personalizado con mayor precisión.',
+            'Utiliza la app diariamente registrando tus comidas por al menos 14 días para desbloquear el modelo personalizado con mayor precisión.',
             style: TextStyle(color: Color(0xFF8E8E9A), fontSize: 11, height: 1.4),
+          )),
+        ],
+      ),
+    );
+  }
+}
+
+class _DisclaimerNote extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        border: Border.all(color: const Color(0xFF2C2C38)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, color: Color(0xFF8E8E9A), size: 16),
+          SizedBox(width: 8),
+          Expanded(child: Text(
+            'Nota importante: Estos valores y sugerencias son únicamente recomendaciones generadas por inteligencia artificial y no sustituyen el consejo médico profesional. Siempre consulta a tu médico.',
+            style: TextStyle(color: Color(0xFF8E8E9A), fontSize: 10, height: 1.3),
           )),
         ],
       ),
