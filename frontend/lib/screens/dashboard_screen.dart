@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/perfil_service.dart';
+import '../features/ai_module/widgets/ai_dashboard_plugin.dart';
 import 'app_colors.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -70,6 +71,22 @@ class DashboardScreen extends StatelessWidget {
 
           // Tarjeta de glucosa
           const _GlucosaCard(),
+
+          const SizedBox(height: 20),
+
+          // --- AI Module Plugin ---
+          AiDashboardPlugin(
+            userId: AuthService.usuario?['id'] ?? 14,
+            contextData: {
+              // Datos conocidos del usuario (glucosa basal, sueño, estrés, ejercicio)
+              // En producción vendrán del último registro del perfil
+              "glucosa_antes": perfil?['glucosa_actual'] ?? 126.0,
+              "horas_sueno": 7.0,
+              "estres": 2,
+              "ejercicio": 30.0,
+            },
+          ),
+          // ------------------------
 
           const SizedBox(height: 20),
 

@@ -55,8 +55,8 @@ class PerfilService {
           .get(Uri.parse('$_base/auth/perfil/'), headers: headers)
           .timeout(_timeout);
 
-      print('📥 GET Perfil - Status: ${response.statusCode}');
-      print('📥 Response: ${response.body}');
+      /* print('📥 GET Perfil - Status: ${response.statusCode}');
+      print('📥 Response: ${response.body}'); */
 
       if (response.statusCode == 200) {
         final data = _normalizarPerfil(jsonDecode(response.body)); // ← añadir

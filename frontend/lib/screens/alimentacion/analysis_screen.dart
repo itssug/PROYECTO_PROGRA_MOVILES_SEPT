@@ -1,7 +1,7 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../services/alimentacion_service.dart';
+import 'package:frontend/services/alimentacion_service.dart';
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
@@ -13,6 +13,8 @@ const _yellow = Color(0xFFFDE68A);
 const _redOrange = Color(0xFFFCA5A5);
 const _textSub = Color(0xFF9CA3AF);
 
+const _demoToken = 'd43af4dada88bc80639484957f30d603079b5b55395d556d210a5837779a49d5';
+
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -21,6 +23,50 @@ class AnalysisScreen extends StatefulWidget {
 }
 
 class _AnalysisScreenState extends State<AnalysisScreen> {
+  late final AlimentacionService _service;
+  ResumenDiario? _resumen;
+  List<RegistroComidaApi> _registros = [];
+  bool _loading = true;
+
+  int _selectedPeriod = 0; // 0=Diario, 1=Semanal, 2=Mensual
+  final List<String> _periods = ['Diario', 'Semanal', 'Mensual'];
+
+  @override
+  void initState() {
+    super.initState();
+    _service = AlimentacionService(token: _demoToken);
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    try {
+      final results = await Future.wait([
+        _service.getResumenDia(),
+        _service.getRegistrosDia(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _resumen = results[0] as ResumenDiario;
+          _registros = results[1] as List<RegistroComidaApi>;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  // Totales de la BD
+  double get _totalCalories => _resumen?.totalCalorias ?? 0;
+  double get _totalCarbs => _resumen?.totalCarbohidratos ?? 0;
+  // Aproximación ya que el backend no guarda macro proteínas/grasas en el resumen
+  double get _totalProteins => (_totalCalories * 0.25) / 4;
+  double get _totalFats => (_totalCalories * 0.25) / 9;
+
+
   int _selectedPeriod = 0; // 0=Diario, 1=Semanal
   final List<String> _periods = ['Diario', 'Semanal'];
 
@@ -556,6 +602,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               "Registro de Hoy",
               style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
+            Text('${_registros.length} elementos',
             Text('${_registrosHoy.length} elementos',
                 style: const TextStyle(color: _textSub, fontSize: 13)),
           ],

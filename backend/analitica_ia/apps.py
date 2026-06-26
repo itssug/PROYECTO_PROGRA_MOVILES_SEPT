@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class AlimentacionConfig(AppConfig):
+class AnaliticaIaConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'alimentacion'
+    name = 'analitica_ia'

@@ -60,10 +60,12 @@ class AnalisisGlucosa(models.Model):
     alimento_culpable = models.CharField(max_length=150, blank=True, null=True)
     clasificacion_respuesta = models.CharField(max_length=16, blank=True, null=True)
     notas_ia = models.TextField(blank=True, null=True)
+    medicamento_tomado = models.IntegerField(blank=True, null=True, default=0)
 
     class Meta:
         managed = False
         db_table = 'analisis_glucosa'
+
 
 
 class Comidas(models.Model):

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'food_log_screen.dart';
 import 'analysis_screen.dart';
 import 'diets_screen.dart';
+import 'food_log_screen.dart';
 import '../app_colors.dart';
 
 class AlimentacionMainScreen extends StatelessWidget {
@@ -44,3 +45,4 @@ class AlimentacionMainScreen extends StatelessWidget {
     );
   }
 }
+
