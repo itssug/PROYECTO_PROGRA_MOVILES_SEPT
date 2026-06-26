@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'core',
     'estado_sueno',
+    'alertas',
 ]
 
 MIDDLEWARE = [
@@ -83,7 +84,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'glucosa_app',
+        'NAME': 'g_final',
         'USER': 'root',
         'PASSWORD': '',
         'HOST': 'localhost',
