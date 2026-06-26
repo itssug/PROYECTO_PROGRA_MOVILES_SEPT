@@ -1,0 +1,54 @@
+# =========================
+# PYTHON / DJANGO
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+
+# Variables de entorno
+.env
+
+# Base de datos SQLite
+db.sqlite3
+
+# Archivos estáticos/cache
+*.log
+media/
+staticfiles/
+
+# Migraciones compiladas
+*.pyo
+
+# =========================
+# FLUTTER / DART
+# =========================
+.dart_tool/
+.packages
+.pub/
+build/
+
+# Flutter generated
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-versions
+.pub-cache/
+
+# Android Studio / VSCode
+.idea/
+.vscode/
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+**/__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
