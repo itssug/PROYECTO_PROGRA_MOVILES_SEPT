@@ -52,6 +52,7 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
     'x-usuario-id',
+    'x-user-id',
 ]
 
 ROOT_URLCONF = 'config.urls'

@@ -13,6 +13,12 @@ import 'usuarios/salud.dart';
 import 'usuarios/perfil.dart';
 import 'chat_screen.dart';
 
+import '../services/in_app_alert_service.dart';
+import '../services/medicamento_service.dart';
+import '../services/registro_service.dart';
+import '../models/medicamento_model.dart';
+import '../models/registro_model.dart';
+
 class MainAppShell extends StatefulWidget {
   const MainAppShell({super.key});
 
@@ -45,6 +51,50 @@ class _MainAppShellState extends State<MainAppShell> {
       }
     } finally {
       if (mounted) setState(() => _cargando = false);
+      // Tras cargar perfil, verificar medicamentos pendientes
+      Future.delayed(const Duration(seconds: 3), _verificarMedicamentosPendientes);
+    }
+  }
+
+  Future<void> _verificarMedicamentosPendientes() async {
+    try {
+      final results = await Future.wait([
+        MedicamentoService.listarActivos(),
+        RegistroService.hoy(),
+      ]);
+      final resMeds = results[0] as ServiceResult<List<Medicamento>>;
+      final resRegs = results[1] as ServiceResult<List<RegistroMedicamento>>;
+
+      if (resMeds.success && resRegs.success) {
+        final meds = resMeds.data!;
+        final regs = resRegs.data!;
+        final ahora = TimeOfDay.now();
+        final ahoraMin = ahora.hour * 60 + ahora.minute;
+
+        for (final m in meds) {
+          if (m.horaToma == null) continue;
+          final parts = m.horaToma!.split(':');
+          final medMin = int.parse(parts[0]) * 60 + int.parse(parts[1]);
+          if (medMin <= ahoraMin) {
+            final tomado = regs.any((r) => r.medicamentoId == m.id && r.fueTomado == 1);
+            if (!tomado) {
+              InAppAlertService.show(
+                title: 'Recordatorio de Medicamento',
+                message: 'Es hora de tomar tu medicamento: ${m.nombre}. ¡No lo olvides!',
+                type: AlertType.warning,
+                duration: const Duration(seconds: 10),
+                actionLabel: 'Confirmar',
+                onTap: () {
+                  setState(() => _selectedIndex = 1);
+                },
+              );
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error verificando meds: $e');
     }
   }
 

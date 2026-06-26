@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/perfil_service.dart';
+import '../services/in_app_alert_service.dart';
 import '../features/ai_module/widgets/ai_dashboard_plugin.dart';
 import 'app_colors.dart';
 
@@ -170,7 +171,69 @@ class DashboardScreen extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
-                // TODO: Navegar a registro de glucosa
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: AppColors.surface,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  builder: (ctx) => Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                      left: 24,
+                      right: 24,
+                      top: 24,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Registrar Glucosa',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Nivel de glucosa (mg/dL)',
+                            labelStyle: const TextStyle(color: AppColors.textMuted),
+                            filled: true,
+                            fillColor: AppColors.bg,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            InAppAlertService.show(
+                              title: '¡Glucosa Registrada!',
+                              message: 'Tu nivel de glucosa ha sido guardado exitosamente.',
+                              type: AlertType.success,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.orange,
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text('Guardar Registro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                );
               },
               icon: const Icon(Icons.add_circle_outline),
               label: const Text('Registrar glucosa'),

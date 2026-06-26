@@ -133,6 +133,8 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
             _SinMedicamentoCard(),
           const SizedBox(height: 24),
 
+          if (widget.medicamento != null) ...[
+
           // ── Pregunta principal
           const SectionLabel('¿Tomaste el medicamento?'),
           Row(
@@ -357,9 +359,10 @@ class _ConfirmarTomaScreenState extends State<ConfirmarTomaScreen>
               ),
             ),
           ],
-        ],
+          ], // End of if (widget.medicamento != null) ...[
+        ], // End of ListView children
       ),
-      floatingActionButton: _fueTomado != null
+      floatingActionButton: _fueTomado != null && widget.medicamento != null
           ? FloatingActionButton.extended(
               onPressed: _guardando ? null : _guardar,
               backgroundColor: _fueTomado! ? AppTheme.success : AppTheme.danger,

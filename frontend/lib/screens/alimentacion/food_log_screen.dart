@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:frontend/services/alimentacion_service.dart';
+import 'package:frontend/services/in_app_alert_service.dart';
 
 // ─── Colores ──────────────────────────────────────────────────────────────────
 const _bg = Color(0xFF0D0D0D);
@@ -102,35 +103,19 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
     bool excedioAzucares = resumen.totalAzucares > _limiteAzucares;
 
     if (excedioCarbos || excedioAzucares) {
-      String mensaje = 'Has superado el límite diario recomendado para pacientes con Diabetes Mellitus tipo II:\n\n';
+      String mensaje = 'Has superado el límite diario:\n';
       if (excedioCarbos) {
         mensaje += '• Carbohidratos: ${resumen.totalCarbohidratos.toStringAsFixed(1)}g (Límite: ${_limiteCarbos}g)\n';
       }
       if (excedioAzucares) {
         mensaje += '• Azúcares: ${resumen.totalAzucares.toStringAsFixed(1)}g (Límite: ${_limiteAzucares}g)\n';
       }
-      mensaje += '\nProcura ajustar tus próximas comidas para mantener tu nivel de glucosa estable.';
 
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: _card,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
-              SizedBox(width: 8),
-              Text('Alerta Nutricional', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: Text(mensaje, style: const TextStyle(color: _textSub, height: 1.5)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Entendido', style: TextStyle(color: _orange, fontWeight: FontWeight.bold)),
-            )
-          ],
-        )
+      InAppAlertService.show(
+        title: 'Alerta Nutricional',
+        message: mensaje.trim(),
+        type: AlertType.error,
+        duration: const Duration(seconds: 8),
       );
     }
   }
@@ -577,7 +562,16 @@ class _FoodLogScreenState extends State<FoodLogScreen> {
         onSaved: () {
           Navigator.pop(context);
           _loadData(checkLimits: true);
-          _showSnack('Alimento registrado correctamente.');
+          
+          // Alerta in-app de recordatorio de glucosa post-prandial
+          Future.delayed(const Duration(milliseconds: 500), () {
+            InAppAlertService.show(
+              title: 'Recordatorio de Glucosa',
+              message: 'Comida registrada. ¡No olvides medir tu glucosa post-prandial en 2 horas!',
+              type: AlertType.info,
+              duration: const Duration(seconds: 6),
+            );
+          });
         },
       ),
     );

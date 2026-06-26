@@ -52,6 +52,16 @@ class _PlanTratamientoScreenState extends State<PlanTratamientoScreen>
     }
   }
 
+  Future<void> _eliminarMedicamento(Medicamento med) async {
+    if (med.id == null) return;
+    final result = await MedicamentoService.eliminar(med.id!);
+    if (result.success) {
+      _cargar();
+    } else {
+      setState(() => _error = result.error);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,8 +110,8 @@ class _PlanTratamientoScreenState extends State<PlanTratamientoScreen>
               : TabBarView(
                   controller: _tabController,
                   children: [
-                    _MedicamentosTab(medicamentos: _activos),
-                    _MedicamentosTab(medicamentos: _inactivos),
+                    _MedicamentosTab(medicamentos: _activos, onEliminar: _eliminarMedicamento),
+                    _MedicamentosTab(medicamentos: _inactivos, onEliminar: _eliminarMedicamento),
                   ],
                 ),
     );
@@ -112,7 +122,8 @@ class _PlanTratamientoScreenState extends State<PlanTratamientoScreen>
 
 class _MedicamentosTab extends StatelessWidget {
   final List<Medicamento> medicamentos;
-  const _MedicamentosTab({required this.medicamentos});
+  final Function(Medicamento) onEliminar;
+  const _MedicamentosTab({required this.medicamentos, required this.onEliminar});
 
   @override
   Widget build(BuildContext context) {
@@ -135,9 +146,24 @@ class _MedicamentosTab extends StatelessWidget {
       children: [
         _ResumenDia(medicamentos: medicamentos),
         const SizedBox(height: 20),
-        ...medicamentos.map((m) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _MedicamentoCard(med: m),
+        ...medicamentos.map((m) => Dismissible(
+          key: Key(m.id.toString()),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+          ),
+          onDismissed: (_) => onEliminar(m),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _MedicamentoCard(med: m),
+          ),
         )),
       ],
     );
