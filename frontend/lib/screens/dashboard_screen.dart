@@ -4,14 +4,36 @@ import '../services/perfil_service.dart';
 import '../services/in_app_alert_service.dart';
 import '../features/ai_module/widgets/ai_dashboard_plugin.dart';
 import 'app_colors.dart';
+import '../services/glucosa_service.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic>? perfil;
 
   const DashboardScreen({super.key, this.perfil});
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  Map<String, dynamic>? _ultimaGlucosa;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarUltimaGlucosa();
+  }
+
+  Future<void> _cargarUltimaGlucosa() async {
+    final gl = await GlucosaService.getUltimaGlucosa();
+    if (mounted && gl != null) {
+      setState(() => _ultimaGlucosa = gl);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final perfil = widget.perfil;
     final nombre = perfil?['nombre'] ?? AuthService.usuario?['nombre'] ?? 'Usuario';
     final email = perfil?['email'] ?? AuthService.usuario?['email'] ?? '';
     double? _toDouble(dynamic v) => v == null ? null : (v is double ? v : double.tryParse(v.toString()));
@@ -71,7 +93,7 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Tarjeta de glucosa
-          const _GlucosaCard(),
+          _GlucosaCard(glucosa: _ultimaGlucosa),
 
           const SizedBox(height: 20),
 
@@ -81,7 +103,7 @@ class DashboardScreen extends StatelessWidget {
             contextData: {
               // Datos conocidos del usuario (glucosa basal, sueño, estrés, ejercicio)
               // En producción vendrán del último registro del perfil
-              "glucosa_antes": perfil?['glucosa_actual'] ?? 126.0,
+              "glucosa_antes": _ultimaGlucosa != null ? double.tryParse(_ultimaGlucosa!['nivel_glucosa'].toString()) : (perfil?['glucosa_actual'] ?? 126.0),
               "horas_sueno": 7.0,
               "estres": 2,
               "ejercicio": 30.0,
@@ -140,13 +162,22 @@ class DashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          const _ActividadItem(
-            icon: Icons.bloodtype,
-            title: 'Última glucosa',
-            value: '126 mg/dL',
-            time: 'Hace 2 horas',
-            color: AppColors.orange,
-          ),
+          if (_ultimaGlucosa != null)
+            _ActividadItem(
+              icon: Icons.bloodtype,
+              title: 'Última glucosa',
+              value: '${_ultimaGlucosa!['nivel_glucosa']} mg/dL',
+              time: '${_ultimaGlucosa!['hora']} ${_ultimaGlucosa!['fecha']}',
+              color: AppColors.orange,
+            )
+          else
+            const _ActividadItem(
+              icon: Icons.bloodtype,
+              title: 'Última glucosa',
+              value: '126 mg/dL',
+              time: 'Hace 2 horas',
+              color: AppColors.orange,
+            ),
           const SizedBox(height: 8),
           const _ActividadItem(
             icon: Icons.restaurant,
@@ -171,6 +202,7 @@ class DashboardScreen extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
+                final glucosaController = TextEditingController();
                 showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
@@ -198,6 +230,7 @@ class DashboardScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         TextField(
+                          controller: glucosaController,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             labelText: 'Nivel de glucosa (mg/dL)',
@@ -212,13 +245,27 @@ class DashboardScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
+                            final val = double.tryParse(glucosaController.text);
+                            if (val == null) return;
+                            
+                            final success = await GlucosaService.registrarGlucosa(val);
                             Navigator.pop(ctx);
-                            InAppAlertService.show(
-                              title: '¡Glucosa Registrada!',
-                              message: 'Tu nivel de glucosa ha sido guardado exitosamente.',
-                              type: AlertType.success,
-                            );
+                            
+                            if (success) {
+                              _cargarUltimaGlucosa();
+                              InAppAlertService.show(
+                                title: '¡Glucosa Registrada!',
+                                message: 'Tu nivel de glucosa ha sido guardado exitosamente.',
+                                type: AlertType.success,
+                              );
+                            } else {
+                              InAppAlertService.show(
+                                title: 'Error',
+                                message: 'No se pudo guardar la glucosa.',
+                                type: AlertType.error,
+                              );
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.orange,
@@ -261,10 +308,17 @@ class DashboardScreen extends StatelessWidget {
 }
 
 class _GlucosaCard extends StatelessWidget {
-  const _GlucosaCard();
+  final Map<String, dynamic>? glucosa;
+  const _GlucosaCard({this.glucosa});
 
   @override
   Widget build(BuildContext context) {
+    final valor = glucosa != null ? double.tryParse(glucosa!['nivel_glucosa'].toString()) ?? 126.0 : 126.0;
+    String timeText = 'Hace 2h';
+    if (glucosa != null && glucosa!['hora'] != null) {
+      timeText = glucosa!['hora'].toString();
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -300,9 +354,9 @@ class _GlucosaCard extends StatelessWidget {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  'Hace 2h',
-                  style: TextStyle(color: Colors.white, fontSize: 12),
+                child: Text(
+                  timeText,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ),
             ],
@@ -311,9 +365,9 @@ class _GlucosaCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text(
-                '126',
-                style: TextStyle(
+              Text(
+                '${valor.toInt()}',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 48,
                   fontWeight: FontWeight.bold,
@@ -334,13 +388,13 @@ class _GlucosaCard extends StatelessWidget {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.trending_up, color: Colors.white, size: 16),
-                    SizedBox(width: 4),
+                    Icon(valor > 140 ? Icons.trending_up : (valor < 70 ? Icons.trending_down : Icons.trending_flat), color: Colors.white, size: 16),
+                    const SizedBox(width: 4),
                     Text(
-                      'Normal',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
+                      valor > 140 ? 'Alta' : (valor < 70 ? 'Baja' : 'Normal'),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ],
                 ),
@@ -349,7 +403,7 @@ class _GlucosaCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           LinearProgressIndicator(
-            value: 126 / 200,
+            value: valor / 200,
             backgroundColor: Colors.white.withOpacity(0.3),
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),

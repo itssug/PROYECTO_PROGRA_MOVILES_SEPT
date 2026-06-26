@@ -302,7 +302,7 @@ class _MainAppShellState extends State<MainAppShell> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => EstadoSuenoScreen(
-                          
+                          usuarioId: usuarioId,
                         ),
                       ),
                     );
