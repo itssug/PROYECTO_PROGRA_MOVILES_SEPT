@@ -1,7 +1,4 @@
-// ============================================================
-// ARCHIVO: lib/services/auth_service.dart
-// CON TODOS LOS CAMPOS DEL SERIALIZER DE DJANGO
-// ============================================================
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;

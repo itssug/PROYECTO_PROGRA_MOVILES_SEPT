@@ -5,6 +5,8 @@ from .views import (
     RegistroComidaListView,
     RegistroComidaDeleteView,
     ResumenDiarioView,
+    ResumenHistoricoView, 
+    DietasCatologoView,   
 )
 
 urlpatterns = [
@@ -18,4 +20,7 @@ urlpatterns = [
 
     # Resumen diario
     path('resumen/', ResumenDiarioView.as_view(), name='resumen-diario'),
+
+    path('historico/', ResumenHistoricoView.as_view(), name='resumen-historico'),
+    path('dietas/', DietasCatologoView.as_view(), name='dietas-catalogo'),
 ]

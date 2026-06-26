@@ -238,3 +238,115 @@ class ResumenDiarioView(APIView):
             "cantidad_registros": totales['cantidad_registros'] or 0,
             "por_tipo_comida": por_tipo,
         })
+
+class ResumenHistoricoView(APIView):
+    """
+    GET /api/alimentacion/historico/?dias=7
+    Devuelve los datos de los últimos X días y la meta de calorías del usuario.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        usuario = obtener_usuario(request)
+        if not usuario:
+            return Response({"error": "Token inválido."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        from datetime import date, timedelta
+        from core.models import Objetivos # Aseguramos importar Objetivos
+
+        dias = int(request.query_params.get('dias', 7))
+        hoy = date.today()
+        fecha_inicio = hoy - timedelta(days=dias-1)
+        
+        # 1. Obtener la meta real del usuario de la tabla `objetivos`
+        objetivo_activo = Objetivos.objects.filter(usuario_id=usuario.id, activo=1).first()
+        meta_calorias = float(objetivo_activo.calorias_diarias) if objetivo_activo and objetivo_activo.calorias_diarias else 1800.0
+
+        # 2. Traer registros de la última semana
+        registros = RegistroComidas.objects.filter(
+            usuario_id=usuario.id,
+            fecha__range=[fecha_inicio, hoy]
+        ).select_related('comida')
+
+        # 3. Preparar diccionario de días
+        historial = {
+            (fecha_inicio + timedelta(days=i)).strftime('%Y-%m-%d'): {
+                'calorias': 0, 'carbos': 0, 'proteinas': 0, 'grasas': 0
+            } for i in range(dias)
+        }
+
+        # 4. Sumar la data. Las proteínas y grasas no están en registro_comidas, 
+        # así que las calculamos matemáticamente usando comida.porcion_tipica
+        for r in registros:
+            fecha_str = r.fecha.strftime('%Y-%m-%d')
+            if fecha_str in historial:
+                historial[fecha_str]['calorias'] += float(r.calorias_calculadas or 0)
+                historial[fecha_str]['carbos'] += float(r.carbohidratos_calculados or 0)
+                
+                porcion = float(r.comida.porcion_tipica or 100)
+                factor = float(r.cantidad) / porcion if porcion > 0 else 0
+                historial[fecha_str]['proteinas'] += float(r.comida.proteinas or 0) * factor
+                historial[fecha_str]['grasas'] += float(r.comida.grasas or 0) * factor
+
+        # Formatear la salida
+        datos_dias = [{"fecha": f, **datos} for f, datos in historial.items()]
+        
+        return Response({
+            "meta_calorias_diarias": meta_calorias,
+            "historial": datos_dias
+        }, status=status.HTTP_200_OK)
+
+
+class DietasCatologoView(APIView):
+    """
+    GET /api/alimentacion/dietas/
+    Sirve el catálogo de dietas de forma estática (sin requerir tabla en BD).
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        dietas = [
+            {
+                "id": "d1",
+                "name": "Estilo de Vida Mediterráneo",
+                "description": "Rica en grasas saludables, granos enteros y proteínas magras. Ideal para la salud del corazón.",
+                "goal": "Salud Cardíaca & Mantenimiento",
+                "calories": 2000,
+                "proteinGrams": 90, "proteinPercent": 20,
+                "carbsGrams": 220, "carbsPercent": 50,
+                "fatGrams": 75, "fatPercent": 30
+            },
+            {
+                "id": "d2",
+                "name": "Quemador de Grasa Bajo en Carbos",
+                "description": "Limita severamente los carbohidratos para poner el cuerpo en un estado de quema de grasa.",
+                "goal": "Pérdida Rápida de Grasa",
+                "calories": 1600,
+                "proteinGrams": 120, "proteinPercent": 35,
+                "carbsGrams": 50, "carbsPercent": 10,
+                "fatGrams": 100, "fatPercent": 55
+            },
+            {
+                "id": "d3",
+                "name": "Vitalidad Vegana",
+                "description": "Plan 100% basado en plantas enfocado en vegetales densos en nutrientes y legumbres.",
+                "goal": "Energía Limpia & Digestión",
+                "calories": 1800,
+                "proteinGrams": 70, "proteinPercent": 15,
+                "carbsGrams": 250, "carbsPercent": 60,
+                "fatGrams": 55, "fatPercent": 25
+            },
+            {
+                "id": "d4",
+                "name": "Plan de Equilibrio Diabético",
+                "description": "Diseñado específicamente con alimentos de bajo índice glucémico para mantener niveles estables de azúcar.",
+                "goal": "Estabilidad Glucémica",
+                "calories": 1700,
+                "proteinGrams": 100, "proteinPercent": 25,
+                "carbsGrams": 150, "carbsPercent": 40,
+                "fatGrams": 65, "fatPercent": 35
+            }
+        ]
+        return Response(dietas, status=status.HTTP_200_OK)

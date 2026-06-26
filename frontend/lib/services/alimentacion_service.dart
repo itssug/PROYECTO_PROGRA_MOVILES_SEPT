@@ -1,7 +1,4 @@
-// ============================================================
-// ARCHIVO: lib/services/alimentacion_service.dart
-// SERVICIO CONECTADO AL BACKEND REAL
-// ============================================================
+
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
@@ -306,6 +303,38 @@ class AlimentacionService {
     } catch (e) {
       if (e is AlimentacionException) rethrow;
       throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getResumenHistorico({int dias = 7}) async {
+    try {
+      final res = await http
+          .get(Uri.parse('$_base/historico/?dias=$dias'), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      throw AlimentacionException('Error al cargar historial.');
+    } catch (e) {
+      if (e is AlimentacionException) rethrow;
+      throw AlimentacionException('No se pudo conectar al servidor.');
+    }
+  }
+
+  /// Obtiene el catálogo de dietas.
+  static Future<List<dynamic>> getDietasCatalogo() async {
+    try {
+      final res = await http
+          .get(Uri.parse('$_base/dietas/'), headers: _headers)
+          .timeout(_timeout);
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as List<dynamic>;
+      }
+      return [];
+    } catch (e) {
+      return [];
     }
   }
 

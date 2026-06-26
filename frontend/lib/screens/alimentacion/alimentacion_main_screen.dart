@@ -1,7 +1,4 @@
-// ============================================================
-// ARCHIVO: lib/screens/alimentacion/alimentacion_main_screen.dart
-// ACTUALIZADO: 3 tabs - Registro, Análisis, Dietas
-// ============================================================
+
 import 'package:flutter/material.dart';
 import 'food_log_screen.dart';
 import 'analysis_screen.dart';
