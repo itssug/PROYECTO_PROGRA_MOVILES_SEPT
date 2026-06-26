@@ -74,6 +74,7 @@ class Command(BaseCommand):
                     estado_val = "tranquilo"
                     calidad_sueno = "bueno"
                     despertares = 0
+                    medicamento_tomado = 1
                 else:
                     horas_sueno = round(choice([4.0, 4.5, 5.0, 5.5, 6.0]), 2)
                     estres = randint(7, 10)
@@ -81,6 +82,7 @@ class Command(BaseCommand):
                     estado_val = "estresado"
                     calidad_sueno = "malo"
                     despertares = 1
+                    medicamento_tomado = choice([0, 1])
 
                 sueno = RegistroSueno.objects.create(
                     usuario=usuario,
@@ -140,12 +142,14 @@ class Command(BaseCommand):
                             Decimal(comida.carga_glucemica) * Decimal("0.8")
                             + Decimal(estres) * Decimal("1.5")
                             - Decimal(actividad.duracion) * Decimal("0.2")
+                            - Decimal(medicamento_tomado * 15)
                         )
                     else:
                         impacto = (
                             Decimal(comida.carga_glucemica) * Decimal("2.5")
                             + Decimal(estres) * Decimal("3")
                             - Decimal(actividad.duracion) * Decimal("0.1")
+                            - Decimal(medicamento_tomado * 20)
                         )
 
                     glucosa_post = float(Decimal(glucosa_pre) + impacto)
@@ -211,7 +215,8 @@ class Command(BaseCommand):
                         prediccion_impacto=impacto,
                         confianza_prediccion=Decimal("0.90"),
                         alimento_culpable=comida.nombre,
-                        clasificacion_respuesta=clasificacion
+                        clasificacion_respuesta=clasificacion,
+                        medicamento_tomado=medicamento_tomado
                         )
                     
         self.stdout.write(
